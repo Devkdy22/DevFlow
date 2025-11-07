@@ -1,31 +1,32 @@
-import express, { Request, Response } from "express";
+import express from "express";
+import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
-import mongoose from "mongoose";
-import projectRoutes from "./routes/projectRoutes.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI as string;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use("/api/projects", projectRoutes);
-
-app.get("/", (req: Request, res: Response) => {
-  res.send("🚀 Devflow API is running...");
+// 기본 라우트 (테스트용)
+app.get("/", (req, res) => {
+  res.send("✅ DevFlow Backend is running!");
 });
-// Connect MongoDB
-const MONGO_URI = process.env.MONGODB_URI || "";
 
+// MongoDB 연결
 mongoose
-  .connect(MONGO_URI)
+  .connect(MONGODB_URI)
   .then(() => {
-    console.log("✅ MongoDB connected");
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    console.log("✅ MongoDB connected successfully");
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    });
   })
-  .catch(err => console.error("❌ MongoDB connection failed:", err));
+  .catch(err => {
+    console.error("❌ MongoDB connection failed:", err);
+    process.exit(1);
+  });
