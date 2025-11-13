@@ -1,0 +1,21 @@
+import mongoose, { Schema, Document } from "mongoose";
+
+export interface ITask extends Document {
+  projectId: string;
+  title: string;
+  status: "할 일" | "진행 중" | "완료";
+  dueDate: Date;
+}
+
+const TaskSchema = new Schema<ITask>({
+  projectId: { type: String, required: true },
+  title: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["할 일", "진행 중", "완료"],
+    default: "할 일",
+  },
+  dueDate: { type: Date },
+});
+
+export default mongoose.model<ITask>("Task", TaskSchema);
