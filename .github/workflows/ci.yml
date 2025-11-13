@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:5
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+
+    strategy:
+      matrix:
+        node-version: [20]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache server node modules
+        uses: actions/cache@v4
+        with:
+          path: server/node_modules
+          key: ${{ runner.os }}-server-node-${{ matrix.node-version }}-${{ hashFiles('server/**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-server-node-${{ matrix.node-version }}-
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      - name: Lint (server)
+        run: |
+          if (cd server && npm run | grep -q "lint"); then npm --prefix server run lint; else echo "no lint script"; fi
+
+      - name: Build / type-check (server)
+        run: |
+          if (cd server && npm run | grep -q "build"); then npm --prefix server run build; else npx -y tsc --project server/tsconfig.json --noEmit || true; fi
+
+      - name: Run server tests with coverage
+        env:
+          MONGODB_URI: mongodb://localhost:27017/devflow_test
+          JWT_SECRET: testsecret
+        run: |
+          npm --prefix server test -- --coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-coverage
+          path: server/coverage
