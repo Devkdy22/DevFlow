@@ -1,4 +1,3 @@
-// src/controllers/scheduleController.ts
 import { Request, Response } from "express";
 import Schedule from "../models/Schedule";
 

@@ -1,0 +1,23 @@
+/* Reset + Tailwind Layer */
+@import "./tailwind.css";
+
+/* Light mode base */
+:root {
+  --background: #ffffff;
+  --foreground: #0f0f0f;
+  --card: #ffffff;
+}
+
+/* Dark mode */
+:root.dark {
+  --background: #0f0f0f;
+  --foreground: #f1f5f9;
+  --card: #1a1a1a;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, sans-serif;
+  transition: background 0.15s ease, color 0.15s ease;
+}
