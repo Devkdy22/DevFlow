@@ -12,7 +12,11 @@ type Task = {
   dueDate?: string;
 };
 
-export default function Tasks() {
+type TaskBoardProps = {
+  onBack?: () => void;
+};
+
+export function TaskBoard({ onBack }: TaskBoardProps) {
   const [items, setItems] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -79,6 +83,11 @@ export default function Tasks() {
 
   return (
     <div style={{ padding: 20 }}>
+      {onBack && (
+        <button type="button" onClick={onBack} style={{ marginBottom: 12 }}>
+          대시보드로 돌아가기
+        </button>
+      )}
       <h2>Tasks</h2>
 
       <form onSubmit={createTask} style={{ marginBottom: 12 }}>

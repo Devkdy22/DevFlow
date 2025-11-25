@@ -12,7 +12,11 @@ type Schedule = {
   userId?: string;
 };
 
-export default function Schedule() {
+type SchedulePageProps = {
+  onBack?: () => void;
+};
+
+export function Schedule({ onBack }: SchedulePageProps) {
   const [items, setItems] = useState<Schedule[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -66,6 +70,11 @@ export default function Schedule() {
 
   return (
     <div style={{ padding: 20 }}>
+      {onBack && (
+        <button type="button" onClick={onBack} style={{ marginBottom: 12 }}>
+          대시보드로 돌아가기
+        </button>
+      )}
       <h2>Schedules</h2>
 
       <form onSubmit={createSchedule} style={{ marginBottom: 12 }}>

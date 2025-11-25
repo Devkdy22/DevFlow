@@ -6,7 +6,11 @@ import { getErrorMessage } from "../utils/error";
 
 type Project = { _id: string; title: string; description?: string };
 
-export default function ProjectForm() {
+type ProjectFormProps = {
+  onBack?: () => void;
+};
+
+export function ProjectForm({ onBack }: ProjectFormProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,6 +59,11 @@ export default function ProjectForm() {
 
   return (
     <div style={{ padding: 20 }}>
+      {onBack && (
+        <button type="button" onClick={onBack} style={{ marginBottom: 12 }}>
+          대시보드로 돌아가기
+        </button>
+      )}
       <h2>Projects</h2>
 
       <form onSubmit={createProject} style={{ marginBottom: 12 }}>

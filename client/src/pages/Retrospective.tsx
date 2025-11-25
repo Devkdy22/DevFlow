@@ -11,7 +11,11 @@ type Retro = {
   userId?: string;
 };
 
-export default function Retrospective() {
+type RetrospectiveProps = {
+  onBack?: () => void;
+};
+
+export function Retrospective({ onBack }: RetrospectiveProps) {
   const [items, setItems] = useState<Retro[]>([]);
   const [content, setContent] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -61,6 +65,11 @@ export default function Retrospective() {
 
   return (
     <div style={{ padding: 20 }}>
+      {onBack && (
+        <button type="button" onClick={onBack} style={{ marginBottom: 12 }}>
+          대시보드로 돌아가기
+        </button>
+      )}
       <h2>Retros</h2>
 
       <form onSubmit={createRetro} style={{ marginBottom: 12 }}>

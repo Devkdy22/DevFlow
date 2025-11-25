@@ -62,14 +62,8 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        {/* 헤더 */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">로그인</h1>
-          <p className="text-gray-600">계정에 접속하세요</p>
-        </div>
-
+    <div className="flex items-center justify-center px-4 h-full">
+      <div className="w-full max-w-2xl">
         {/* 에러 메시지 */}
         {err && (
           <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm border border-red-200/50 rounded-xl">
