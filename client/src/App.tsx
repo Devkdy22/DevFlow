@@ -12,10 +12,8 @@ import { AnimatedBackground } from "./components/AnimatedBackground";
 import { CodeRain } from "./components/CodeRain";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
-import ProtectedRoute from "./components/ProtectedRoute";
 import {
   Code2,
-  Sparkles,
   LayoutDashboard,
   FolderKanban,
   Calendar,
@@ -38,7 +36,7 @@ type Page =
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [, setIsAuthenticated] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigateToPage = (page: Page) => {
@@ -79,17 +77,23 @@ function AppContent() {
     github: string
   ) => {
     try {
-      const res = await axios.post("/api/auth/signup", {
+      // const res =
+      await axios.post("/api/auth/register", {
         name,
         email,
         password,
-        github,
+        ...(github ? { githubId: github } : {}),
       });
-      const token = res.data?.token;
-      if (!token) throw new Error("회원가입 실패. 토큰이 없습니다.");
-      localStorage.setItem("token", token);
-      setIsAuthenticated(true);
-      setCurrentPage("dashboard");
+      //const token = res.data?.token;
+      //if (!token) throw new Error("회원가입 실패. 토큰이 없습니다.");
+      // localStorage.setItem("token", token);
+      //setIsAuthenticated(true);
+      // setCurrentPage("dashboard");
+
+      // ✅ 회원가입 성공 메시지 표시
+      alert("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.");
+      // ✅ 로그인 탭으로 전환 (토큰 저장하지 않음)
+      setActiveTab("login");
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         throw new Error(error.response?.data?.message || "회원가입 실패");
@@ -166,7 +170,7 @@ function AppContent() {
         <CodeRain />
 
         <div className="relative min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-lg">
             {/* Back Button */}
             <Button
               variant="ghost"
@@ -179,10 +183,10 @@ function AppContent() {
             {/* Glass Card */}
             <div className="relative group">
               {/* Glow Effect */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-[#4F46E5] to-[#10B981] rounded-3xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-500" />
+              <div className=" absolute -inset-1 bg-gradient-to-r from-[#4F46E5] to-[#10B981] rounded-3xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-500" />
 
               {/* Main Card */}
-              <div className="relative bg-white/70 backdrop-blur-xl rounded-3xl border border-white/50 shadow-2xl overflow-hidden">
+              <div className="relative bg-white/70 backdrop-blur-xl rounded-3xl border border-white/50 shadow-2xl overflow-hidden  ">
                 {/* Logo */}
                 <div className="flex flex-col items-center pt-10 pb-6 px-6">
                   <div className="relative">
@@ -191,7 +195,8 @@ function AppContent() {
                       <Code2 className="h-8 w-8 text-white" />
                     </div>
                   </div>
-                  <h1 className="mt-4 bg-gradient-to-r from-[#4F46E5] to-[#10B981] bg-clip-text text-transparent">
+
+                  <h1 className="font-bold mt-4 bg-gradient-to-r from-[#4F46E5] to-[#10B981] bg-clip-text text-transparent">
                     DevFlow
                   </h1>
                 </div>
@@ -240,7 +245,7 @@ function AppContent() {
                 {/* Form Content */}
                 <div className="p-8 lg:p-10">
                   <div className="mb-8">
-                    <h2 className="text-gray-900 mb-2">
+                    <h2 className="text-gray-900 mb-2 font-bold">
                       {activeTab === "login"
                         ? "다시 오신 것을 환영합니다"
                         : "새로운 여정을 시작하세요"}
@@ -378,7 +383,9 @@ function AppContent() {
       </nav>
 
       {/* Page Content */}
-      {currentPage === "dashboard" && <Dashboard onNavigate={navigateToPage} />}
+      {currentPage === "dashboard" && (
+        <Dashboard onNavigate={navigateToPage as (page: string) => void} />
+      )}
       {currentPage === "projects" && (
         <ProjectForm onBack={() => navigateToPage("dashboard")} />
       )}

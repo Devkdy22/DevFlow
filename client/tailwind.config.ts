@@ -1,7 +1,20 @@
 import type { Config } from "tailwindcss";
 
+interface ExtendedConfig extends Config {
+  safelist?: string[];
+}
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
+  safelist: [
+    "text-4xl",
+    "font-bold",
+    "bg-gradient-to-r",
+    "from-[#4F46E5]",
+    "to-[#10B981]",
+    "bg-clip-text",
+    "text-transparent",
+  ],
   theme: {
     extend: {
       colors: {
@@ -21,4 +34,4 @@ export default {
     },
   },
   plugins: [],
-} satisfies Config;
+} satisfies ExtendedConfig;
