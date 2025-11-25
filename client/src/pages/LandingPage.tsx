@@ -1,7 +1,6 @@
 import { motion } from "motion/react";
 import {
   Code2,
-  Sparkles,
   Zap,
   ArrowRight,
   CheckCircle2,
@@ -23,7 +22,7 @@ interface LandingPageProps {
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#0a0b14]">
+    <div className="min-h-screen  w-full  relative overflow-hidden bg-[#0a0b14]">
       {/* Grid Pattern Background */}
       <div
         className="absolute inset-0"
@@ -111,7 +110,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="text-white mb-6"
             >
-              <span className="bg-gradient-to-r from-[#4F46E5] via-[#7C3AED] to-[#10B981] bg-clip-text text-transparent">
+              <span className="text-5xl font-bold bg-gradient-to-r from-[#4F46E5] via-[#7C3AED] to-[#10B981] bg-clip-text text-transparent">
                 DevFlow
               </span>
             </motion.h1>
@@ -132,7 +131,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto leading-relaxed"
             >
               일정 관리부터 태스크 추적, 프로젝트 회고까지. 개발 워크플로우를
-              혁신적으로 개선하세요.
+              위한 선택
             </motion.p>
 
             {/* CTA Buttons */}
@@ -144,21 +143,12 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             >
               <Button
                 onClick={onGetStarted}
+                size="xl"
                 className="group relative px-8 py-6 bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] hover:from-[#4338CA] hover:to-[#6D28D9] text-white shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <span className="flex items-center gap-2">
                   시작하기
                   <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </span>
-              </Button>
-
-              <Button
-                variant="outline"
-                className="px-8 py-6 bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-300"
-              >
-                <span className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  둘러보기
                 </span>
               </Button>
             </motion.div>
