@@ -1,8 +1,12 @@
 import app from "./app";
 import { connectDB } from "./config/db";
+import dotenv from "dotenv";
 
-const PORT = process.env.PORT || 5000;
+dotenv.config();
+const PORT = process.env.PORT || 5050;
 const MONGODB_URI = process.env.MONGODB_URI as string;
+
+console.log("MONGODB_URI:", process.env.MONGODB_URI);
 
 const startServer = async () => {
   try {

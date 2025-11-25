@@ -16,11 +16,12 @@ import { registerUser, loginUser } from "../controllers/authController";
 
 const router = express.Router();
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
+// router.post("/", registerUser);
+// router.post("/login", loginUser);
 
 // 회원가입
 router.post("/register", async (req, res) => {
+  console.log("회원가입 요청:", req.body);
   try {
     const { name, email, password } = req.body;
 
