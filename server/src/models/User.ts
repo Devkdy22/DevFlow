@@ -6,6 +6,8 @@ export interface IUser extends Document {
   githubId?: string;
   password: string;
   createdAt: Date;
+  resetPasswordToken?: string; // 해시 저장
+  resetPasswordExpires?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -14,6 +16,8 @@ const UserSchema = new Schema<IUser>({
   githubId: { type: String },
   password: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
 });
 
-export default mongoose.model<IUser>("User", UserSchema);
+export default mongoose.model<IUser>("User", UserSchema, "users");

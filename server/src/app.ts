@@ -11,6 +11,14 @@ import scheduleRoutes from "./routes/scheduleRoutes";
 dotenv.config();
 const app = express();
 
+// 모든 origin 허용 + 프리플라이트 처리
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
 app.use(cors());
 app.use(express.json());
 

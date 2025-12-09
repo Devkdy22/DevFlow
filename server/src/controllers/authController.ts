@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
+import { generateResetToken, sendResetEmail } from "../utils/authUtils";
 
 // JWT 생성 함수
 const generateToken = (id: string, email: string) => {
@@ -84,5 +85,35 @@ export const loginUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     res.status(500).json({ message: "로그인 실패", error });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email)
+      return res.status(400).json({ message: "이메일을 입력해주세요." });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res
+        .status(404)
+        .json({ message: "해당 이메일의 유저를 찾을 수 없습니다." });
+
+    const { token, tokenHash } = generateResetToken();
+
+    // DB에 토큰과 만료시간 저장 (예: user.resetPasswordToken, user.resetPasswordExpire)
+    user.resetPasswordToken = tokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1시간
+    await user.save();
+
+    await sendResetEmail(email, token); // 반드시 await
+
+    res.json({
+      message: "비밀번호 재설정 메일을 보냈습니다. 메일을 확인하세요.",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "메일 전송에 실패했습니다." });
   }
 };
