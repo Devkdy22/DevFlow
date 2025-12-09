@@ -107,6 +107,7 @@ const InputField = memo(
 );
 
 InputField.displayName = "InputField";
+//onGitHubSignup
 export function SignupForm({ onSubmit, onGitHubSignup }: SignupFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

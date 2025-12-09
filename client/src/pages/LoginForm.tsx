@@ -43,7 +43,8 @@ export function LoginForm({
   onGoSignup,
   onForgotPassword,
   onGitHubLogin,
-}: LoginFormProps) {
+}: // onGitHubLogin,
+LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");

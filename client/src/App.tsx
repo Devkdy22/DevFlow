@@ -26,11 +26,14 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
-import {
-  sendResetPasswordMail,
-  initiateGitHubAuth,
-  handleGitHubCallback,
-} from "./services/auth";
+import { sendResetPasswordMail, handleGitHubCallback } from "./services/auth";
+
+const AUTH_TOKEN_KEY = "accessToken";
+
+// ✅ Axios Authorization 헤더 설정
+axios.defaults.headers.common["Authorization"] = `Bearer ${localStorage.getItem(
+  AUTH_TOKEN_KEY
+)}`;
 
 type Page =
   | "landing"
@@ -52,27 +55,50 @@ function AppContent() {
     | "github-signup"
   >(null);
   const [resetToken, setResetToken] = useState<string>("");
-  const [, setIsAuthenticated] = useState(false);
+  const [, setIsAuthenticated] = useState<boolean>(() => {
+    return !!localStorage.getItem(AUTH_TOKEN_KEY);
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // URL에서 토큰 파라미터 확인 (비밀번호 재설정 링크)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("reset_token");
+    const resetToken = params.get("reset_token");
+    const githubToken = params.get("token");
     const ghCode = params.get("code");
     const ghState = params.get("state");
 
-    if (token) {
-      setResetToken(token);
+    // 비밀번호 재설정
+    if (resetToken) {
+      setResetToken(resetToken);
       setAuthMode("reset-password");
       setCurrentPage("auth");
-      // URL 정리
       window.history.replaceState({}, "", window.location.pathname);
+      return;
     }
 
-    // GitHub OAuth 콜백 처리
+    // ✅ GitHub 로그인 완료 (JWT 토큰 방식)
+    if (githubToken) {
+      localStorage.setItem(AUTH_TOKEN_KEY, githubToken);
+      setIsAuthenticated(true);
+      setCurrentPage("dashboard");
+
+      // URL 정리
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+
+    // ✅ GitHub OAuth 코드 방식 처리
     if (ghCode && ghState) {
       handleGitHubAuthCallback(ghCode, ghState);
+      return;
+    }
+
+    // ✅ 새로고침 / 뒤로가기 시 로그인 유지
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (storedToken) {
+      setIsAuthenticated(true);
+      setCurrentPage("dashboard");
     }
   }, []);
 
@@ -82,7 +108,7 @@ function AppContent() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     setIsAuthenticated(false);
     setCurrentPage("landing");
   };
@@ -92,8 +118,10 @@ function AppContent() {
     try {
       const res = await axios.post("/api/auth/login", { email, password });
       const token = res.data?.token;
-      if (!token) throw new Error("로그인에 실패했습니다. 토큰이 없습니다.");
-      localStorage.setItem("token", token);
+
+      if (!token) throw new Error("로그인 실패");
+
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
       setIsAuthenticated(true);
       setCurrentPage("dashboard");
     } catch (error: unknown) {
@@ -161,26 +189,16 @@ function AppContent() {
     setActiveTab("login");
   };
 
-  // GitHub 인증 시작
-  const handleGitHubInitialSubmit = async (mode: "login" | "signup") => {
-    try {
-      const { authUrl } = await initiateGitHubAuth(mode);
-      // GitHub 인증 페이지로 리다이렉트
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error("GitHub 인증 시작 실패:", error);
-      alert("GitHub 인증을 시작할 수 없습니다.");
-    }
-  };
-
   // GitHub OAuth 콜백 처리
   const handleGitHubAuthCallback = async (code: string, state: string) => {
     try {
       const { token, user } = await handleGitHubCallback(code, state);
-      localStorage.setItem("token", token);
+
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
       setIsAuthenticated(true);
       setCurrentPage("dashboard");
 
+      window.history.replaceState({}, "", "/");
       alert(`환영합니다, ${user.name}님!`);
     } catch (error) {
       console.error("GitHub 인증 실패:", error);
@@ -394,29 +412,12 @@ function AppContent() {
                       />
                     )}
 
-                    {/* GitHub 로그인 */}
-                    {authMode === "github-login" && (
-                      <GitHubAuth
-                        mode="login"
-                        onInitialSubmit={() =>
-                          handleGitHubInitialSubmit("login")
-                        }
-                        onVerification={async () => {}}
-                        onSuccess={() => {}}
-                        onBack={() => setAuthMode(null)}
-                      />
-                    )}
-                    {/* GitHub 회원가입 */}
+                    {/* ✅ GitHub 로그인 */}
+                    {authMode === "github-login" && <GitHubAuth mode="login" />}
+
+                    {/* ✅ GitHub 회원가입 */}
                     {authMode === "github-signup" && (
-                      <GitHubAuth
-                        mode="signup"
-                        onInitialSubmit={() =>
-                          handleGitHubInitialSubmit("signup")
-                        }
-                        onVerification={async () => {}}
-                        onSuccess={() => {}}
-                        onBack={() => setAuthMode(null)}
-                      />
+                      <GitHubAuth mode="signup" />
                     )}
                     {/* ✅ 기본 로그인 / 회원가입 */}
                     {authMode === null && (
