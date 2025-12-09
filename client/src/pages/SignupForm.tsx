@@ -14,6 +14,7 @@ interface SignupFormProps {
     password: string,
     github: string
   ) => Promise<void>;
+  onGitHubSignup?: () => void;
 }
 
 // InputField를 별도 컴포넌트로 분리하고 memo로 최적화
@@ -106,7 +107,7 @@ const InputField = memo(
 );
 
 InputField.displayName = "InputField";
-export function SignupForm({ onSubmit }: SignupFormProps) {
+export function SignupForm({ onSubmit, onGitHubSignup }: SignupFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -116,7 +117,7 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  // const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,10 +148,6 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const onGithubSignup = () => {
-    window.location.href = `${API_BASE}/api/auth/github`;
   };
 
   // 각 필드의 포커스/블러 핸들러를 useCallback으로 메모이제이션
@@ -283,7 +280,7 @@ export function SignupForm({ onSubmit }: SignupFormProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={onGithubSignup}
+          onClick={onGitHubSignup}
           className="w-full relative group py-6 rounded-xl border-gray-200/50 
                      bg-white/30 backdrop-blur-sm hover:bg-white/50
                      hover:border-gray-300 transition-all duration-300 

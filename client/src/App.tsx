@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginForm } from "./pages/LoginForm";
 import { SignupForm } from "./pages/SignupForm";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { GitHubAuth } from "./pages/GitHubAuth";
+import { ResetPassword } from "./pages/ResetPassword";
 import { Dashboard } from "./pages/Dashboard";
 import { ProjectForm } from "./pages/ProjectForm";
 import { Schedule } from "./pages/Schedule";
@@ -23,6 +26,11 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
+import {
+  sendResetPasswordMail,
+  initiateGitHubAuth,
+  handleGitHubCallback,
+} from "./services/auth";
 
 type Page =
   | "landing"
@@ -36,8 +44,37 @@ type Page =
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [authMode, setAuthMode] = useState<
+    | null
+    | "forgot-password"
+    | "reset-password"
+    | "github-login"
+    | "github-signup"
+  >(null);
+  const [resetToken, setResetToken] = useState<string>("");
   const [, setIsAuthenticated] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // URL에서 토큰 파라미터 확인 (비밀번호 재설정 링크)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("reset_token");
+    const ghCode = params.get("code");
+    const ghState = params.get("state");
+
+    if (token) {
+      setResetToken(token);
+      setAuthMode("reset-password");
+      setCurrentPage("auth");
+      // URL 정리
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    // GitHub OAuth 콜백 처리
+    if (ghCode && ghState) {
+      handleGitHubAuthCallback(ghCode, ghState);
+    }
+  }, []);
 
   const navigateToPage = (page: Page) => {
     setCurrentPage(page);
@@ -84,16 +121,11 @@ function AppContent() {
         password,
         ...(github ? { githubId: github } : {}),
       });
-      //const token = res.data?.token;
-      //if (!token) throw new Error("회원가입 실패. 토큰이 없습니다.");
-      // localStorage.setItem("token", token);
-      //setIsAuthenticated(true);
-      // setCurrentPage("dashboard");
-
       // ✅ 회원가입 성공 메시지 표시
       alert("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.");
       // ✅ 로그인 탭으로 전환 (토큰 저장하지 않음)
       setActiveTab("login");
+      setAuthMode(null);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         throw new Error(error.response?.data?.message || "회원가입 실패");
@@ -104,6 +136,60 @@ function AppContent() {
       }
     }
   };
+
+  /*추가 코드 시작*/
+  // 비밀번호 찾기 핸들러
+  const handleForgotPassword = async (email: string) => {
+    try {
+      // 보안상, 이메일 존재 유무를 노출하지 않음 — 항상 200/성공 메시지 반환 처리 권장
+      await sendResetPasswordMail(email);
+      // UI: ForgotPassword 컴포넌트는 성공 시 자체적으로 메시지 표시하므로 여기선 authMode 초기화만
+      setAuthMode(null);
+      setActiveTab("login");
+      // 또는 다른 UX 원하면 setAuthMode(null) 대신 성공 화면 리다이렉트 등
+    } catch (err) {
+      // 네트워크/서버 오류는 사용자에게 보여줄 수 있음
+      console.error(err);
+      // throw 또는 toast 표시 (ForgotPassword가 catch 하도록 throw)
+      throw err;
+    }
+  };
+  // 비밀번호 재설정 성공 핸들러
+  const handleResetPasswordSuccess = () => {
+    alert("비밀번호가 성공적으로 변경되었습니다. 로그인해주세요.");
+    setAuthMode(null);
+    setActiveTab("login");
+  };
+
+  // GitHub 인증 시작
+  const handleGitHubInitialSubmit = async (mode: "login" | "signup") => {
+    try {
+      const { authUrl } = await initiateGitHubAuth(mode);
+      // GitHub 인증 페이지로 리다이렉트
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("GitHub 인증 시작 실패:", error);
+      alert("GitHub 인증을 시작할 수 없습니다.");
+    }
+  };
+
+  // GitHub OAuth 콜백 처리
+  const handleGitHubAuthCallback = async (code: string, state: string) => {
+    try {
+      const { token, user } = await handleGitHubCallback(code, state);
+      localStorage.setItem("token", token);
+      setIsAuthenticated(true);
+      setCurrentPage("dashboard");
+
+      alert(`환영합니다, ${user.name}님!`);
+    } catch (error) {
+      console.error("GitHub 인증 실패:", error);
+      alert("GitHub 인증에 실패했습니다.");
+      setCurrentPage("auth");
+    }
+  };
+
+  /*추가 코드 끝*/
 
   const handleGetStarted = () => {
     setCurrentPage("auth");
@@ -202,9 +288,10 @@ function AppContent() {
                 </div>
 
                 {/* Tabs */}
-                <div className="relative flex border-b border-gray-200/50 bg-gray-50/30 backdrop-blur-sm">
-                  <div
-                    className={`
+                {authMode !== "reset-password" && (
+                  <div className="relative flex border-b border-gray-200/50 bg-gray-50/30 backdrop-blur-sm">
+                    <div
+                      className={`
                       absolute bottom-0 h-0.5 bg-gradient-to-r from-[#4F46E5] to-[#10B981]
                       transition-all duration-300 ease-out
                       ${
@@ -213,10 +300,13 @@ function AppContent() {
                           : "left-1/2 w-1/2"
                       }
                     `}
-                  />
-                  <button
-                    onClick={() => setActiveTab("login")}
-                    className={`
+                    />
+                    <button
+                      onClick={() => {
+                        setActiveTab("login");
+                        setAuthMode(null); // GitHub / 비밀번호찾기 초기화}
+                      }}
+                      className={`
                       flex-1 py-5 text-center transition-all duration-300 relative
                       ${
                         activeTab === "login"
@@ -224,12 +314,15 @@ function AppContent() {
                           : "text-gray-500 hover:text-gray-700"
                       }
                     `}
-                  >
-                    <span className="relative z-10">로그인</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("signup")}
-                    className={`
+                    >
+                      <span className="relative z-10">로그인</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab("signup");
+                        setAuthMode(null); // GitHub / 비밀번호찾기 초기화
+                      }}
+                      className={`
                       flex-1 py-5 text-center transition-all duration-300 relative
                       ${
                         activeTab === "signup"
@@ -237,11 +330,11 @@ function AppContent() {
                           : "text-gray-500 hover:text-gray-700"
                       }
                     `}
-                  >
-                    <span className="relative z-10">회원가입</span>
-                  </button>
-                </div>
-
+                    >
+                      <span className="relative z-10">회원가입</span>
+                    </button>
+                  </div>
+                )}
                 {/* Form Content */}
                 <div className="p-8 lg:p-10">
                   <div className="mb-8">
@@ -258,15 +351,98 @@ function AppContent() {
                   </div>
 
                   {/* Animated Form Transition */}
-                  <div className="relative">
+                  {/* <div className="relative">
                     {activeTab === "login" ? (
                       <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-                        <LoginForm onSubmit={handleLogin} />
+                        <LoginForm
+                          onSubmit={handleLogin}
+                          onGoSignup={() => setActiveTab("signup")}
+                          onForgotPassword={() =>
+                            setAuthMode("forgot-password")
+                          }
+                          onGitHubLogin={() => setAuthMode("github-login")}
+                        />
                       </div>
                     ) : (
                       <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        <SignupForm onSubmit={handleSignup} />
+                        <SignupForm
+                          onSubmit={handleSignup}
+                          onGitHubSignup={() => setAuthMode("github-signup")}
+                        />
                       </div>
+                    )}
+                  </div> */}
+                  {/* Form Content */}
+                  <div className="relative">
+                    {/* 비밀번호 재설정 */}
+                    {authMode === "reset-password" && (
+                      <ResetPassword
+                        token={resetToken}
+                        onSuccess={handleResetPasswordSuccess}
+                        onBack={() => {
+                          setAuthMode(null);
+                          setActiveTab("login");
+                        }}
+                      />
+                    )}
+
+                    {/* 비밀번호 찾기 */}
+                    {authMode === "forgot-password" && (
+                      <ForgotPassword
+                        onSubmit={handleForgotPassword}
+                        onBack={() => setAuthMode(null)}
+                      />
+                    )}
+
+                    {/* GitHub 로그인 */}
+                    {authMode === "github-login" && (
+                      <GitHubAuth
+                        mode="login"
+                        onInitialSubmit={() =>
+                          handleGitHubInitialSubmit("login")
+                        }
+                        onVerification={async () => {}}
+                        onSuccess={() => {}}
+                        onBack={() => setAuthMode(null)}
+                      />
+                    )}
+                    {/* GitHub 회원가입 */}
+                    {authMode === "github-signup" && (
+                      <GitHubAuth
+                        mode="signup"
+                        onInitialSubmit={() =>
+                          handleGitHubInitialSubmit("signup")
+                        }
+                        onVerification={async () => {}}
+                        onSuccess={() => {}}
+                        onBack={() => setAuthMode(null)}
+                      />
+                    )}
+                    {/* ✅ 기본 로그인 / 회원가입 */}
+                    {authMode === null && (
+                      <>
+                        {activeTab === "login" ? (
+                          <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+                            <LoginForm
+                              onSubmit={handleLogin}
+                              onGoSignup={() => setActiveTab("signup")}
+                              onForgotPassword={() =>
+                                setAuthMode("forgot-password")
+                              }
+                              onGitHubLogin={() => setAuthMode("github-login")}
+                            />
+                          </div>
+                        ) : (
+                          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <SignupForm
+                              onSubmit={handleSignup}
+                              onGitHubSignup={() =>
+                                setAuthMode("github-signup")
+                              }
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

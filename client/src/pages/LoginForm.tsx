@@ -34,8 +34,16 @@ import { Lock, Mail, ArrowRight } from "lucide-react";
 //   };
 interface LoginFormProps {
   onSubmit: (email: string, password: string) => void;
+  onForgotPassword: () => void;
+  onGitHubLogin: () => void;
+  onGoSignup: () => void;
 }
-export function LoginForm({ onSubmit }: LoginFormProps) {
+export function LoginForm({
+  onSubmit,
+  onGoSignup,
+  onForgotPassword,
+  onGitHubLogin,
+}: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -136,6 +144,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
                 type="button"
                 className="text-sm text-[#4F46E5] hover:text-[#4338CA] transition-all duration-300 
                            hover:translate-x-0.5 flex items-center gap-1 group"
+                onClick={onForgotPassword}
               >
                 비밀번호 찾기
                 <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -220,6 +229,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
                          bg-white/30 backdrop-blur-sm hover:bg-white/50
                          hover:border-gray-300 transition-all duration-300 
                          hover:scale-[1.02] shadow-sm hover:shadow-md"
+              onClick={onGitHubLogin}
             >
               <svg className="w-5 h-5 mr-2 inline-block" viewBox="0 0 24 24">
                 <path
@@ -233,12 +243,13 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
             {/* 회원가입 링크 */}
             <p className="text-center text-gray-600 text-sm mt-6">
               계정이 없으신가요?{" "}
-              <a
-                href="/register"
-                className="text-[#4F46E5] hover:text-[#4338CA] font-semibold transition-colors duration-300"
+              <button
+                type="button"
+                onClick={onGoSignup}
+                className="text-[#4e46e5a4] hover:text-[#4338CA] font-semibold transition-colors duration-300"
               >
                 회원가입
-              </a>
+              </button>
             </p>
           </div>
         </form>
