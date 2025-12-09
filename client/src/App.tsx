@@ -45,7 +45,7 @@ type Page =
   | "retrospective";
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>("landing");
+  // const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const [authMode, setAuthMode] = useState<
     | null
@@ -59,6 +59,11 @@ function AppContent() {
     return !!localStorage.getItem(AUTH_TOKEN_KEY);
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>(
+    token ? "dashboard" : "landing"
+  );
 
   // URL에서 토큰 파라미터 확인 (비밀번호 재설정 링크)
   useEffect(() => {
@@ -100,6 +105,8 @@ function AppContent() {
       setIsAuthenticated(true);
       setCurrentPage("dashboard");
     }
+
+    setAuthChecked(true); // 인증 확인 완료
   }, []);
 
   const navigateToPage = (page: Page) => {
@@ -574,6 +581,12 @@ function AppContent() {
       )}
       {currentPage === "retrospective" && (
         <Retrospective onBack={() => navigateToPage("dashboard")} />
+      )}
+      {/* 인증 확인 로딩 오버레이 */}
+      {!authChecked && (
+        <div className="absolute inset-0 bg-black/5 backdrop-blur-[1px] flex items-center justify-center z-50 pointer-events-none">
+          <div className="w-14 h-14 border-4 border-t-purple-500 border-b-purple-500 border-l-transparent border-r-transparent rounded-full animate-spin" />
+        </div>
       )}
     </div>
   );
