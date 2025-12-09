@@ -42,7 +42,10 @@ router.post("/login", async (req, res) => {
     if (!user)
       return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch =
+      user.password !== undefined
+        ? await bcrypt.compare(password, user.password)
+        : false;
     if (!isMatch)
       return res.status(400).json({ message: "비밀번호가 일치하지 않습니다." });
 

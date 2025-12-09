@@ -7,6 +7,7 @@ import projectRoutes from "./routes/projectRoutes";
 import retroRoutes from "./routes/retroRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import scheduleRoutes from "./routes/scheduleRoutes";
+import githubAuthRoutes from "./routes/authGithub";
 
 dotenv.config();
 const app = express();
@@ -19,8 +20,18 @@ app.use(
     credentials: true,
   })
 );
-app.use(cors());
+// app.use(cors());
 app.use(express.json());
+
+// 🔍 모든 요청 로깅 미들웨어 추가
+app.use((req, res, next) => {
+  console.log("======================");
+  console.log("📍 요청:", req.method, req.originalUrl);
+  console.log("Query:", req.query);
+  console.log("Body:", req.body);
+  console.log("======================");
+  next();
+});
 
 // 기본 라우트
 app.get("/", (_, res) => res.send("✅ DevFlow API is running"));
@@ -31,5 +42,6 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/retros", retroRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/auth/github", githubAuthRoutes);
 
 export default app;
