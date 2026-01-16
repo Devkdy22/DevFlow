@@ -50,7 +50,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "비밀번호가 일치하지 않습니다." });
 
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { id: user._id.toString(), email: user.email },
       process.env.JWT_SECRET || "defaultsecret",
       { expiresIn: "7d" }
     );
