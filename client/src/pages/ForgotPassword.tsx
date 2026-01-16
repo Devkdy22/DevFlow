@@ -16,7 +16,7 @@ export function ForgotPassword({ onBack, onSubmit }: ForgotPasswordProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [_error, setError] = useState("");
+  const [, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
