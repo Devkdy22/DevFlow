@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   LayoutDashboard,
@@ -18,10 +19,6 @@ import { TechBackground } from "../components/TechBackground";
 import { motion } from "motion/react";
 import api from "../services/api";
 import { getErrorMessage } from "../utils/error";
-
-interface DashboardProps {
-  onNavigate: (page: string) => void;
-}
 
 type Project = {
   _id: string;
@@ -239,7 +236,8 @@ function buildActivities(projects: Project[], retros: Retro[]): Activity[] {
   return merged;
 }
 
-export function Dashboard({ onNavigate }: DashboardProps) {
+export function Dashboard() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [stats, setStats] = useState<StatCard[]>([]);
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
@@ -325,7 +323,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             >
               <LayoutDashboard className="h-8 w-8 text-[#4F46E5] dark:text-[#818CF8]" />
             </motion.div>
-            <h1 className="text-gray-900 dark:text-white">대시보드</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              대시보드
+            </h1>
           </div>
           <p className="text-gray-600 dark:text-gray-400">
             프로젝트 현황을 한눈에 확인하세요
@@ -371,11 +371,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <stat.icon className="h-6 w-6 text-white" />
                     </div>
                   </div>
-                  <div className="mb-2 dark:text-white">{stat.value}</div>
-                  <p className="text-gray-600 dark:text-gray-400 mb-1">
+                  <div className="text-3xl font-bold mb-2 dark:text-white">
+                    {stat.value}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                     {stat.label}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
                     {stat.change}
                   </p>
                 </div>
@@ -388,7 +390,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {/* Projects Overview */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-gray-900 dark:text-white">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 진행 중인 프로젝트
               </h2>
               <motion.div
@@ -396,7 +398,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 whileTap={{ scale: 0.95 }}
               >
                 <Button
-                  onClick={() => onNavigate("projects")}
+                  onClick={() => navigate("/projects")}
                   className="bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] hover:from-[#4338CA] hover:to-[#6D28D9] text-white shadow-lg hover:shadow-xl transition-all"
                 >
                   <Plus className="h-4 w-4 mr-2" />새 프로젝트
@@ -433,7 +435,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300">
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h3 className="text-gray-900 dark:text-white mb-1">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                           {project.name}
                         </h3>
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
@@ -448,7 +450,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </div>
                       </div>
                       <div
-                        className={`px-3 py-1 rounded-full text-sm ${
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
                           project.status === "active"
                             ? "bg-[#10B981]/10 text-[#10B981] dark:bg-[#10B981]/20 dark:text-[#6EE7B7]"
                             : "bg-[#F59E0B]/10 text-[#F59E0B] dark:bg-[#F59E0B]/20 dark:text-[#FCD34D]"
@@ -463,7 +465,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         <span className="text-gray-600 dark:text-gray-400">
                           진행률
                         </span>
-                        <span className="text-[#4F46E5] dark:text-[#818CF8]">
+                        <span className="font-semibold text-[#4F46E5] dark:text-[#818CF8]">
                           {project.progress}%
                         </span>
                       </div>
@@ -474,7 +476,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onNavigate("tasks")}
+                        onClick={() => navigate("/tasks")}
                         className="flex-1 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border-gray-200 dark:border-slate-600"
                       >
                         태스크 보기
@@ -482,7 +484,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onNavigate("retrospective")}
+                        onClick={() => navigate("/retrospective")}
                         className="flex-1 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border-gray-200 dark:border-slate-600"
                       >
                         회고 작성
@@ -503,12 +505,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               transition={{ duration: 0.5, delay: 0.3 }}
             >
               <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 shadow-xl">
-                <h3 className="text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   빠른 작업
                 </h3>
                 <div className="space-y-3">
                   <Button
-                    onClick={() => onNavigate("schedule")}
+                    onClick={() => navigate("/schedule")}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#4F46E5]/5 hover:border-[#4F46E5]/20"
                   >
@@ -516,7 +518,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     일정 추가
                   </Button>
                   <Button
-                    onClick={() => onNavigate("tasks")}
+                    onClick={() => navigate("/tasks")}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#10B981]/5 hover:border-[#10B981]/20"
                   >
@@ -524,7 +526,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     태스크 생성
                   </Button>
                   <Button
-                    onClick={() => onNavigate("retrospective")}
+                    onClick={() => navigate("/retrospective")}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#F59E0B]/5 hover:border-[#F59E0B]/20"
                   >
@@ -542,7 +544,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               transition={{ duration: 0.5, delay: 0.4 }}
             >
               <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 shadow-xl">
-                <h3 className="text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   최근 활동
                 </h3>
                 <div className="space-y-4">
@@ -568,7 +570,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 dark:text-white mb-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                           {activity.title}
                         </p>
                         {activity.project && (
@@ -603,7 +605,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
                   <div>
-                    <h3 className="text-gray-900 dark:text-white mb-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
                       다가오는 마감일
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
@@ -611,7 +613,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       확인할 수 있습니다.
                     </p>
                     <Button
-                      onClick={() => onNavigate("schedule")}
+                      onClick={() => navigate("/schedule")}
                       size="sm"
                       className="bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl transition-all"
                     >
