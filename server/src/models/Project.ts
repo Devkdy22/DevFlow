@@ -1,7 +1,7 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface IProject extends Document {
-  userId: string;
+  userId: Types.ObjectId;
   title: string;
   description: string;
   category: string;
@@ -10,7 +10,11 @@ export interface IProject extends Document {
 }
 
 const ProjectSchema = new Schema<IProject>({
-  userId: { type: String, required: true },
+  userId: {
+    type: Schema.Types.ObjectId, //String → ObjectId
+    ref: "User", //User와 관계
+    required: true,
+  },
   title: { type: String, required: true },
   description: { type: String },
   category: { type: String },
