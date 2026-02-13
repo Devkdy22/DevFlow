@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { TechBackground } from "../components/TechBackground";
+import { TopToast } from "../components/common/TopToast";
 import { motion } from "motion/react";
 import api from "../services/api";
 import { getErrorMessage } from "../utils/error";
@@ -48,6 +49,7 @@ type Task = {
   projectId?: string;
   status?: string;
   dueDate?: string;
+  updatedAt?: string;
 };
 
 type Retro = {
@@ -858,13 +860,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60]">
-          <div className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm shadow-lg">
-            {toast.message}
-          </div>
-        </div>
-      )}
+      {toast && <TopToast message={toast.message} />}
 
       {/* Upcoming Deadlines Dialog */}
       <Dialog open={openUpcoming} onOpenChange={setOpenUpcoming}>
