@@ -7,7 +7,7 @@ import Project from "../models/Project";
 // 태스크 생성
 export const createTask = async (req: Request, res: Response) => {
   try {
-    const { title, projectId, status, dueDate } = req.body;
+    const { title, projectId, status, dueDate, memo } = req.body;
     /* 1️⃣ 필수 값 검증 */
     if (!title || !projectId) {
       return res.status(400).json({
@@ -43,6 +43,7 @@ export const createTask = async (req: Request, res: Response) => {
       userId: new Types.ObjectId(req.user!.id),
       status: status ?? "todo",
       dueDate: dueDate ? new Date(dueDate) : undefined,
+      memo: memo ?? undefined,
     });
 
     res.status(201).json(task);
