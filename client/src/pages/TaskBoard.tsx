@@ -5,6 +5,7 @@ import {
   Kanban,
   Plus,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../utils/error";
 import { Button } from "../components/ui/button";
@@ -53,9 +54,8 @@ export function TaskBoard() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    ALL_PROJECTS
-  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [projectSelectionReady, setProjectSelectionReady] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<
     "todo" | "doing" | "done" | null
@@ -104,6 +104,7 @@ export function TaskBoard() {
   //   load();
   // }, []);
   useEffect(() => {
+    setProjectSelectionReady(false);
     api.get<Project[]>("/api/projects").then(res => {
       setProjects(res.data);
 
@@ -118,12 +119,14 @@ export function TaskBoard() {
         setSelectedProjectId(ALL_PROJECTS);
         showToast("선택한 프로젝트를 찾을 수 없어 전체 태스크를 표시합니다.");
       }
+      setProjectSelectionReady(true);
     });
   }, [searchParams]);
 
   useEffect(() => {
+    if (!projectSelectionReady) return;
     load(selectedProjectId);
-  }, [selectedProjectId]);
+  }, [selectedProjectId, projectSelectionReady]);
 
   useEffect(() => {
     if (!highlightId) return;
@@ -317,35 +320,48 @@ export function TaskBoard() {
         </div>
 
         {/* Kanban */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {(["todo", "doing", "done"] as const).map(col => (
-            <TaskColumn
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          {(["todo", "doing", "done"] as const).map((col, index) => (
+            <motion.div
               key={col}
-              column={col}
-              title={colMap[col].title}
-              colorClassName={colMap[col].color}
-              tasks={columns[col]}
-              dragOver={dragOverCol === col}
-              draggingId={draggingId}
-              highlightId={highlightId}
-              isHighlighting={isHighlighting}
-              onDragEnterColumn={setDragOverCol}
-              onDragLeaveColumn={() => setDragOverCol(null)}
-              onDropColumn={onDropColumn}
-              onDragStartTask={onDragStart}
-              onDragEndTask={onDragEnd}
-              onOpenTask={openEdit}
-              onDeleteTask={deleteTask}
-              onAdvanceTask={task =>
-                updateTaskStatus(task._id, col === "todo" ? "doing" : "done")
-              }
-              showProjectName={selectedProjectId === ALL_PROJECTS}
-              getProjectName={projectId =>
-                projectId ? projectNameById[projectId] ?? "알 수 없는 프로젝트" : "프로젝트 미지정"
-              }
-            />
+              initial={{ opacity: 0, scale: 0.995 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2, ease: "easeOut", delay: index * 0.03 }}
+            >
+              <TaskColumn
+                column={col}
+                title={colMap[col].title}
+                colorClassName={colMap[col].color}
+                tasks={columns[col]}
+                dragOver={dragOverCol === col}
+                draggingId={draggingId}
+                highlightId={highlightId}
+                isHighlighting={isHighlighting}
+                onDragEnterColumn={setDragOverCol}
+                onDragLeaveColumn={() => setDragOverCol(null)}
+                onDropColumn={onDropColumn}
+                onDragStartTask={onDragStart}
+                onDragEndTask={onDragEnd}
+                onOpenTask={openEdit}
+                onDeleteTask={deleteTask}
+                onAdvanceTask={task =>
+                  updateTaskStatus(task._id, col === "todo" ? "doing" : "done")
+                }
+                showProjectName={selectedProjectId === ALL_PROJECTS}
+                getProjectName={projectId =>
+                  projectId
+                    ? projectNameById[projectId] ?? "알 수 없는 프로젝트"
+                    : "프로젝트 미지정"
+                }
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
       <TaskFormDialog
         open={open}

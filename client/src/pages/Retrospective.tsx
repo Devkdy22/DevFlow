@@ -41,7 +41,8 @@ export function Retrospective() {
   const [items, setItems] = useState<Retro[]>([]);
   const [content, setContent] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [filterProjectId, setFilterProjectId] = useState("");
+  const [filterProjectId, setFilterProjectId] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
   const [err, setErr] = useState("");
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -79,7 +80,12 @@ export function Retrospective() {
 
   useEffect(() => {
     const qp = searchParams.get("projectId") || "";
-    if (qp) setProjectId(qp);
+    if (qp) {
+      setProjectId(qp);
+      setFilterProjectId(qp);
+    } else {
+      setFilterProjectId("all");
+    }
     load();
   }, [searchParams]);
 
@@ -88,6 +94,7 @@ export function Retrospective() {
     if (!qp) return;
     if (projects.some(p => p._id === qp)) {
       setProjectId(qp);
+      setFilterProjectId(qp);
     }
   }, [projects, searchParams]);
 
@@ -108,17 +115,6 @@ export function Retrospective() {
     return map;
   }, [items]);
 
-  useEffect(() => {
-    if (filterProjectId) return;
-    if (projectId) {
-      setFilterProjectId(projectId);
-      return;
-    }
-    if (projects.length > 0) {
-      setFilterProjectId(projects[0]._id);
-    }
-  }, [projectId, projects, filterProjectId]);
-
   const createRetro = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
@@ -129,6 +125,7 @@ export function Retrospective() {
       });
       setItems(s => [res.data, ...s]);
       setContent("");
+      setCreateOpen(false);
     } catch (error: unknown) {
       setErr(getErrorMessage(error) || "회고 생성 실패");
     }
@@ -171,175 +168,218 @@ export function Retrospective() {
     }
   };
 
+  const projectNameById = useMemo(
+    () =>
+      projects.reduce<Record<string, string>>((acc, project) => {
+        acc[project._id] = project.title;
+        return acc;
+      }, {}),
+    [projects]
+  );
+
+  const visibleRetroGroups = useMemo(() => {
+    if (filterProjectId === "all") {
+      return Array.from(retrosByProject.entries()).sort((a, b) => {
+        const aKey = a[0];
+        const bKey = b[0];
+        const aName =
+          aKey === "unassigned" ? "프로젝트 미지정" : projectNameById[aKey] ?? "알 수 없는 프로젝트";
+        const bName =
+          bKey === "unassigned" ? "프로젝트 미지정" : projectNameById[bKey] ?? "알 수 없는 프로젝트";
+        return aName.localeCompare(bName, "ko");
+      });
+    }
+    return [[filterProjectId, retrosByProject.get(filterProjectId) ?? []]] as const;
+  }, [filterProjectId, retrosByProject, projectNameById]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
             <FileText className="h-8 w-8 text-[#4F46E5]" />
             <h1 className="text-gray-900 dark:text-white">프로젝트 회고</h1>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400">
+              작성된 회고를 중심으로 모아보고 필요할 때 작성하세요
+            </p>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
-            프로젝트를 돌아보고 개선점을 기록하세요
-          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              대시보드
+            </Button>
+            <Button
+              onClick={() => setCreateOpen(true)}
+              className="bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white"
+            >
+              회고 작성
+            </Button>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Form */}
-          <div className="lg:col-span-2">
-            <form
-              onSubmit={createRetro}
-              onKeyDown={e => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  void createRetro(e as any);
-                }
-              }}
-            >
-              <Card className="p-8 mb-6 bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl shadow-xl">
-                <div className="space-y-6">
-                  <div className="text-xs text-slate-500">
-                    작성일: {new Date().toLocaleString()}
-                  </div>
-                  <div>
-                    <Label>프로젝트 선택 (선택)</Label>
-                    <Select
-                      value={projectId}
-                      onValueChange={value => setProjectId(value)}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="프로젝트를 선택하세요" />
-                      </SelectTrigger>
-
-                      <SelectContent className="max-h-60 overflow-y-auto">
-                        {projects.map(project => (
-                          <SelectItem key={project._id} value={project._id}>
-                            {project.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>회고 내용 *</Label>
-                  <Textarea
-                      value={content}
-                      onChange={e => setContent(e.target.value)}
-                      placeholder="이번 프로젝트에서 느낀 점을 자유롭게 작성하세요"
-                      rows={6}
-                      required
-                      className="mt-2 resize-none bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-                    />
-                  </div>
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="p-5 bg-white/75 dark:bg-slate-900/65 backdrop-blur-xl border border-white/70 dark:border-slate-700/70 shadow-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  회고 목록
                 </div>
-              </Card>
-
-              {err && <div className="text-red-500 mb-4">{err}</div>}
-
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/dashboard")}
-                  className="flex-1"
-                >
-                  대시보드로
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white"
-                >
-                  회고 생성
-                </Button>
+                <Select value={filterProjectId} onValueChange={setFilterProjectId}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue placeholder="프로젝트 필터" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="all">전체 프로젝트</SelectItem>
+                    {projects.map(project => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="text-xs text-slate-500 mt-2">
-                단축키: ⌘/Ctrl+Enter 생성
-              </div>
-            </form>
+            </Card>
+
+            {visibleRetroGroups.map(([groupProjectId, retros]) => {
+              const groupName =
+                groupProjectId === "unassigned"
+                  ? "프로젝트 미지정"
+                  : projectNameById[groupProjectId] ?? "알 수 없는 프로젝트";
+              return (
+                <Card
+                  key={groupProjectId}
+                  className="p-5 bg-white/75 dark:bg-slate-900/65 backdrop-blur-xl border border-white/70 dark:border-slate-700/70 shadow-xl"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                      {groupName}
+                    </h3>
+                    <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      {retros.length}개
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {retros.map(r => (
+                      <motion.div
+                        key={r._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        whileHover={{
+                          scale: 1.006,
+                          borderColor: "rgba(99,102,241,0.45)",
+                        }}
+                        whileTap={{ scale: 0.995 }}
+                        className="p-4 rounded-xl bg-white dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-700/70 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/15 hover:shadow-md transition-all duration-200"
+                      >
+                        <p className="text-sm leading-6 text-slate-700 dark:text-slate-100 whitespace-pre-wrap">
+                          {r.content}
+                        </p>
+                        <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                          {r.updatedAt && r.updatedAt !== r.createdAt
+                            ? `마지막 수정: ${new Date(r.updatedAt).toLocaleString()}`
+                            : r.createdAt
+                            ? `작성: ${new Date(r.createdAt).toLocaleString()}`
+                            : ""}
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
+                            수정
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteRetro(r._id)}
+                          >
+                            삭제
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                    {retros.length === 0 && (
+                      <div className="text-sm text-slate-500">회고가 없습니다.</div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            <Card className="p-6 bg-white/70 dark:bg-slate-800/60">
-              <h3 className="mb-4 text-gray-900 dark:text-white">
-                작성된 회고
-              </h3>
-
-              <div className="space-y-4">
-                <div>
-                  <Label>프로젝트 필터</Label>
-                  <Select
-                    value={filterProjectId}
-                    onValueChange={value => setFilterProjectId(value)}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="프로젝트를 선택하세요" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60 overflow-y-auto">
-                      {projects.map(project => (
-                        <SelectItem key={project._id} value={project._id}>
-                          {project.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <ul className="space-y-3">
-                  {(retrosByProject.get(filterProjectId) || []).map(r => (
-                    <motion.li
-                      key={r._id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/70 hover:shadow-md transition-shadow"
-                    >
-                      <p className="text-gray-800 dark:text-slate-100 mb-2">
-                        {r.content}
-                      </p>
-                      <div className="text-xs text-gray-500 dark:text-slate-400">
-                        {r.updatedAt && r.updatedAt !== r.createdAt
-                          ? `마지막 수정: ${new Date(
-                              r.updatedAt
-                            ).toLocaleString()}`
-                          : r.createdAt
-                          ? `작성: ${new Date(
-                              r.createdAt
-                            ).toLocaleString()}`
-                          : ""}
-                      </div>
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEdit(r)}
-                        >
-                          수정
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => deleteRetro(r._id)}
-                        >
-                          삭제
-                        </Button>
-                      </div>
-                    </motion.li>
-                  ))}
-                  {filterProjectId &&
-                    (retrosByProject.get(filterProjectId) || []).length ===
-                      0 && (
-                      <div className="text-sm text-slate-500">
-                        선택한 프로젝트에 회고가 없습니다.
-                      </div>
-                    )}
-                </ul>
+            <Card className="p-6 sticky top-24 bg-white/75 dark:bg-slate-900/65 backdrop-blur-xl border border-white/70 dark:border-slate-700/70 shadow-xl">
+              <div className="text-sm text-slate-500 dark:text-slate-400">전체 회고</div>
+              <div className="mt-1 text-3xl font-bold text-slate-800 dark:text-white">
+                {items.length}
               </div>
+              <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                작성된 회고를 먼저 확인하고, 필요할 때 상단 버튼으로 새 회고를 작성하세요.
+              </div>
+              <Button
+                className="mt-4 w-full bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white"
+                onClick={() => setCreateOpen(true)}
+              >
+                새 회고 작성
+              </Button>
             </Card>
           </div>
         </div>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent
+          className="sm:max-w-3xl max-h-[86vh] overflow-hidden"
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void createRetro(e as any);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>회고 작성</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createRetro} className="space-y-4 overflow-y-auto pr-1">
+            <div className="text-xs text-slate-500">작성일: {new Date().toLocaleString()}</div>
+            <div>
+              <Label>프로젝트 (선택)</Label>
+              <Select value={projectId} onValueChange={value => setProjectId(value)}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="프로젝트를 선택하세요" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  {projects.map(project => (
+                    <SelectItem key={project._id} value={project._id}>
+                      {project.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>회고 내용 *</Label>
+              <Textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="이번 프로젝트에서 느낀 점을 자유롭게 작성하세요"
+                rows={11}
+                required
+                className="mt-2 resize-none bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              />
+            </div>
+            {err && <div className="text-red-500 text-sm">{err}</div>}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                취소
+              </Button>
+              <Button type="submit">작성</Button>
+            </div>
+            <div className="text-xs text-slate-500">단축키: ⌘/Ctrl+Enter 작성</div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog

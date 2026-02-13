@@ -37,6 +37,7 @@ import {
   toLocalDateKey,
   toLocalDateTimeInputValue,
 } from "../utils/dateTime";
+import { getKoreanHolidayMap } from "../utils/krHolidays";
 
 import { motion, AnimatePresence } from "motion/react";
 import { TechBackground } from "../components/TechBackground";
@@ -53,11 +54,53 @@ type Schedule = {
   _id: string;
   title: string;
   date?: string;
+  startDate?: string;
+  endDate?: string;
   category?: string;
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
   memo?: string;
+};
+
+const getScheduleRange = (item: Schedule) => {
+  const startBase = item.startDate || item.date;
+  const endBase = item.endDate || item.startDate || item.date;
+  if (!startBase || !endBase) return null;
+
+  const startDate = new Date(startBase);
+  const endDate = new Date(endBase);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  const start = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+  );
+  const end = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+  );
+
+  if (start.getTime() > end.getTime()) {
+    return { start: end, end: start };
+  }
+  return { start, end };
+};
+
+const getSpanTypeByDate = (item: Schedule, targetDate: Date) => {
+  const range = getScheduleRange(item);
+  if (!range) return "single" as const;
+  const startKey = toLocalDateKey(range.start);
+  const endKey = toLocalDateKey(range.end);
+  const targetKey = toLocalDateKey(targetDate);
+  if (startKey === endKey) return "single" as const;
+  if (targetKey === startKey) return "start" as const;
+  if (targetKey === endKey) return "end" as const;
+  return "middle" as const;
 };
 
 type SavedPalette = {
@@ -207,6 +250,9 @@ export function Schedule() {
   const [items, setItems] = useState<Schedule[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [rangeStartDate, setRangeStartDate] = useState("");
+  const [rangeEndDate, setRangeEndDate] = useState("");
+  const [createMode, setCreateMode] = useState<"single" | "range">("single");
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [err, setErr] = useState("");
@@ -219,6 +265,9 @@ export function Schedule() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editRangeStartDate, setEditRangeStartDate] = useState("");
+  const [editRangeEndDate, setEditRangeEndDate] = useState("");
+  const [editMode, setEditMode] = useState<"single" | "range">("single");
   const [editCategory, setEditCategory] = useState("");
   const [editMemo, setEditMemo] = useState("");
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
@@ -240,6 +289,11 @@ export function Schedule() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [palettePulse, setPalettePulse] = useState(false);
   const [dragPaletteName, setDragPaletteName] = useState<string | null>(null);
+  const [showCreateCategoryPanel, setShowCreateCategoryPanel] = useState(false);
+  const [showEditCategoryPanel, setShowEditCategoryPanel] = useState(false);
+  const [selectedDayQuery, setSelectedDayQuery] = useState("");
+  const [selectedDayCategory, setSelectedDayCategory] = useState("all");
+  const [selectedDayExpanded, setSelectedDayExpanded] = useState(false);
   const defaultCategories = DEFAULT_CATEGORIES;
   const presetPalettes = PRESET_PALETTES;
 
@@ -257,6 +311,12 @@ export function Schedule() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    setSelectedDayExpanded(false);
+    setSelectedDayQuery("");
+    setSelectedDayCategory("all");
+  }, [selectedDate?.toDateString()]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -318,15 +378,39 @@ export function Schedule() {
     setErr("");
     try {
       const isoDate = toIsoStringOrUndefined(date);
+      const isoStartDate = toIsoStringOrUndefined(rangeStartDate);
+      const isoEndDate = toIsoStringOrUndefined(rangeEndDate);
+      if (createMode === "single" && !isoDate) {
+        setErr("일정을 위한 날짜를 입력해 주세요.");
+        return;
+      }
+      if (createMode === "range" && (!isoStartDate || !isoEndDate)) {
+        setErr("기간 일정은 시작일과 마감일이 모두 필요합니다.");
+        return;
+      }
+      if (
+        createMode === "range" &&
+        isoStartDate &&
+        isoEndDate &&
+        new Date(isoStartDate).getTime() > new Date(isoEndDate).getTime()
+      ) {
+        setErr("마감일은 시작일 이후여야 합니다.");
+        return;
+      }
       const res = await api.post("/api/schedules", {
         title,
-        date: isoDate,
+        date: createMode === "single" ? isoDate : isoStartDate || isoDate,
+        startDate: createMode === "range" ? isoStartDate : undefined,
+        endDate: createMode === "range" ? isoEndDate : undefined,
         category,
         memo: memo || undefined,
       });
       setItems(s => [res.data, ...s]);
       setTitle("");
       setDate("");
+      setRangeStartDate("");
+      setRangeEndDate("");
+      setCreateMode("single");
       setCategory("");
       setMemo("");
       if (category && !defaultCategories.includes(category)) {
@@ -349,11 +433,18 @@ export function Schedule() {
   };
 
   const openEditDialog = (item: Schedule) => {
+    const startDate = item.startDate || item.date;
+    const endDate = item.endDate || item.date;
+    const hasRange = !!item.startDate || !!item.endDate;
     setEditId(item._id);
     setEditTitle(item.title);
     setEditDate(toLocalDateTimeInputValue(item.date));
+    setEditRangeStartDate(toLocalDateTimeInputValue(startDate));
+    setEditRangeEndDate(toLocalDateTimeInputValue(endDate));
+    setEditMode(hasRange ? "range" : "single");
     setEditCategory(item.category ?? "");
     setEditMemo(item.memo ?? "");
+    setShowEditCategoryPanel(false);
     setOpenEdit(true);
   };
 
@@ -363,9 +454,30 @@ export function Schedule() {
     setErr("");
     try {
       const isoDate = toIsoStringOrUndefined(editDate);
+      const isoStartDate = toIsoStringOrUndefined(editRangeStartDate);
+      const isoEndDate = toIsoStringOrUndefined(editRangeEndDate);
+      if (editMode === "single" && !isoDate) {
+        setErr("일정을 위한 날짜를 입력해 주세요.");
+        return;
+      }
+      if (editMode === "range" && (!isoStartDate || !isoEndDate)) {
+        setErr("기간 일정은 시작일과 마감일이 모두 필요합니다.");
+        return;
+      }
+      if (
+        editMode === "range" &&
+        isoStartDate &&
+        isoEndDate &&
+        new Date(isoStartDate).getTime() > new Date(isoEndDate).getTime()
+      ) {
+        setErr("마감일은 시작일 이후여야 합니다.");
+        return;
+      }
       const res = await api.put(`/api/schedules/${editId}`, {
         title: editTitle,
-        date: isoDate,
+        date: editMode === "single" ? isoDate : isoStartDate || isoDate,
+        startDate: editMode === "range" ? isoStartDate : undefined,
+        endDate: editMode === "range" ? isoEndDate : undefined,
         category: editCategory,
         memo: editMemo || undefined,
       });
@@ -392,14 +504,21 @@ export function Schedule() {
 
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const emptyDays = Array.from({ length: firstDay });
+  const holidayMap = useMemo(() => getKoreanHolidayMap(year), [year]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, Schedule[]> = {};
     items.forEach(item => {
-      if (!item.date) return;
-      const key = toLocalDateKey(new Date(item.date));
-      map[key] = map[key] || [];
-      map[key].push(item);
+      const range = getScheduleRange(item);
+      if (!range) return;
+
+      const cursor = new Date(range.start);
+      while (cursor.getTime() <= range.end.getTime()) {
+        const key = toLocalDateKey(cursor);
+        map[key] = map[key] || [];
+        map[key].push(item);
+        cursor.setDate(cursor.getDate() + 1);
+      }
     });
     return map;
   }, [items]);
@@ -481,6 +600,45 @@ export function Schedule() {
     const rest = savedPalettes.filter(p => !p.favorite);
     return [...fav, ...rest];
   }, [savedPalettes]);
+
+  const selectedDayEvents = useMemo(() => {
+    if (!selectedDate) return [];
+    return eventsByDate[getDateKey(selectedDate)] || [];
+  }, [eventsByDate, selectedDate]);
+
+  const selectedDayCategories = useMemo(
+    () => Array.from(new Set(selectedDayEvents.map(e => e.category || "기타"))),
+    [selectedDayEvents],
+  );
+
+  const selectedDayFilteredEvents = useMemo(() => {
+    const q = selectedDayQuery.trim().toLowerCase();
+    return selectedDayEvents
+      .filter(e => {
+        const categoryName = e.category || "기타";
+        if (selectedDayCategory !== "all" && categoryName !== selectedDayCategory)
+          return false;
+        if (!q) return true;
+        return (
+          e.title.toLowerCase().includes(q) || (e.memo || "").toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const aRange = getScheduleRange(a);
+        const bRange = getScheduleRange(b);
+        const aTime = aRange ? aRange.start.getTime() : Number.MAX_SAFE_INTEGER;
+        const bTime = bRange ? bRange.start.getTime() : Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      });
+  }, [selectedDayCategory, selectedDayEvents, selectedDayQuery]);
+
+  const selectedDayVisibleEvents = useMemo(
+    () =>
+      selectedDayExpanded
+        ? selectedDayFilteredEvents
+        : selectedDayFilteredEvents.slice(0, 6),
+    [selectedDayExpanded, selectedDayFilteredEvents],
+  );
 
   const colorForCategory = (category?: string) => {
     const key = (category || "기타").trim();
@@ -613,7 +771,17 @@ export function Schedule() {
               대시보드
             </Button>
             <Button
-              onClick={() => setOpenCreate(true)}
+              onClick={() => {
+                const selectedBase = selectedDate
+                  ? `${toLocalDateKey(selectedDate)}T09:00`
+                  : "";
+                setCreateMode("single");
+                setDate(selectedBase);
+                setRangeStartDate(selectedBase);
+                setRangeEndDate(selectedBase);
+                setShowCreateCategoryPanel(false);
+                setOpenCreate(true);
+              }}
               className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
             >
               <Plus className="h-4 w-4 mr-2" /> 새 일정
@@ -670,10 +838,19 @@ export function Schedule() {
                 const uniqueCategories = Array.from(
                   new Set(dayEvents.map(e => e.category || "기타")),
                 );
+                const continuedCount = dayEvents.filter(event => {
+                  const range = getScheduleRange(event);
+                  if (!range) return false;
+                  return toLocalDateKey(range.start) !== toLocalDateKey(range.end);
+                }).length;
+                const hasContinuedEvents = continuedCount > 0;
                 const isSelected =
                   selectedDate?.toDateString() === dateObj.toDateString();
                 const isToday =
                   new Date().toDateString() === dateObj.toDateString();
+                const isSunday = dateObj.getDay() === 0;
+                const holidayName = holidayMap[key];
+                const isHoliday = Boolean(holidayName);
 
                 return (
                   <motion.button
@@ -684,20 +861,41 @@ export function Schedule() {
                     transition={{ duration: 0.22, delay: day * 0.01 }}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.96 }}
-                    className={`aspect-square rounded-xl p-2 relative transition text-slate-800 dark:text-slate-100 ${
+                    className={`aspect-square rounded-xl p-2 relative border transition-all duration-200 text-slate-800 dark:text-slate-100 ${
                       isSelected
-                        ? "bg-indigo-500/20 ring-2 ring-indigo-500 shadow-lg"
-                        : "bg-white/40 hover:bg-white/70 dark:bg-slate-800/60 dark:hover:bg-slate-700/70"
-                    }`}
+                        ? "bg-indigo-500/20 border-indigo-300 ring-2 ring-indigo-500 shadow-lg"
+                        : "bg-white/60 border-slate-200/80 hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-md dark:bg-slate-800/60 dark:border-slate-700 dark:hover:bg-slate-700/70 dark:hover:border-indigo-500/60"
+                    } ${isToday && !isSelected ? "ring-1 ring-indigo-200/80 dark:ring-indigo-700/70" : ""}`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">{day}</span>
+                      <span
+                        className={`text-sm font-semibold ${
+                          isHoliday || isSunday
+                            ? "text-rose-600 dark:text-rose-400"
+                            : ""
+                        }`}
+                      >
+                        {day}
+                      </span>
                       {isToday && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white">
                           오늘
                         </span>
                       )}
                     </div>
+                    {hasContinuedEvents && (
+                      <>
+                        <div className="absolute top-0 left-2 right-2 h-1 rounded-b-full bg-gradient-to-r from-indigo-500/80 to-cyan-400/80" />
+                        <div className="mt-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-300 truncate text-left">
+                          이어진 일정 {continuedCount > 1 ? `${continuedCount}개` : ""}
+                        </div>
+                      </>
+                    )}
+                    {holidayName && (
+                      <div className="mt-1 text-[10px] font-medium text-rose-600 dark:text-rose-400 truncate text-left">
+                        {holidayName}
+                      </div>
+                    )}
                     {dayEvents.length > 0 && (
                       <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
                         {uniqueCategories.slice(0, 2).map((cat, i) => (
@@ -722,9 +920,16 @@ export function Schedule() {
 
           {/* Selected Day */}
           <Card className="p-6 bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl shadow-2xl border border-white/60 dark:border-slate-700/60">
-            <h3 className="mb-4 text-slate-800 dark:text-white font-semibold">
-              선택한 날짜 일정
-            </h3>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="text-slate-800 dark:text-white font-semibold">
+                선택한 날짜 일정
+              </h3>
+              {selectedDate && (
+                <span className="text-xs rounded-full px-2 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  {selectedDayEvents.length}개
+                </span>
+              )}
+            </div>
 
             {!selectedDate && (
               <p className="text-slate-500 dark:text-slate-400 text-sm">
@@ -732,31 +937,108 @@ export function Schedule() {
               </p>
             )}
 
+            {selectedDate && (
+              <div className="mb-3 space-y-2">
+                <Input
+                  value={selectedDayQuery}
+                  onChange={e => setSelectedDayQuery(e.target.value)}
+                  placeholder="제목/메모 검색"
+                  className="h-9 bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600"
+                />
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedDayCategory}
+                    onValueChange={setSelectedDayCategory}
+                  >
+                    <SelectTrigger className="h-9 bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600">
+                      <SelectValue placeholder="카테고리" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 카테고리</SelectItem>
+                      {selectedDayCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedDayQuery("");
+                      setSelectedDayCategory("all");
+                    }}
+                  >
+                    초기화
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <AnimatePresence>
               {selectedDate &&
-                (eventsByDate[getDateKey(selectedDate)] || []).length === 0 && (
+                selectedDayFilteredEvents.length === 0 && (
                   <div className="text-sm text-slate-500 dark:text-slate-400">
                     선택한 날짜에 일정이 없습니다.
                   </div>
                 )}
               {selectedDate &&
-                (eventsByDate[getDateKey(selectedDate)] || []).map(e => (
+                selectedDayVisibleEvents.length > 0 && (
+                  <div className="max-h-[430px] overflow-y-auto pr-1">
+                    {selectedDayVisibleEvents.map(e => (
                   <motion.div
                     key={e._id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-3 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-sm cursor-pointer hover:shadow-md transition"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.16 }}
+                    className="mb-3 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-sm cursor-pointer hover:shadow-md hover:border-indigo-300/70 dark:hover:border-indigo-500/60 transition"
                     onClick={() => openEditDialog(e)}
                   >
                     <div className="flex justify-between">
                       <div>
+                        {selectedDate && (() => {
+                          const spanType = getSpanTypeByDate(e, selectedDate);
+                          if (spanType === "single") return null;
+                          return (
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                이어진 일정
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                                {spanType === "start"
+                                  ? "시작일"
+                                  : spanType === "end"
+                                    ? "마감일"
+                                    : "진행일"}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <strong>{e.title}</strong>
-                        {e.date && (
-                          <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(e.date).toLocaleString()}
-                          </div>
-                        )}
+                        {(() => {
+                          const range = getScheduleRange(e);
+                          if (!range) return null;
+                          const isRange =
+                            toLocalDateKey(range.start) !==
+                            toLocalDateKey(range.end);
+                          if (isRange) {
+                            return (
+                              <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                                <Clock className="h-3 w-3" />
+                                {range.start.toLocaleDateString()} ~{" "}
+                                {range.end.toLocaleDateString()}
+                              </div>
+                            );
+                          }
+                          return e.date ? (
+                            <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(e.date).toLocaleString()}
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
                           <span
                             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
@@ -803,8 +1085,21 @@ export function Schedule() {
                       </Button>
                     </div>
                   </motion.div>
-                ))}
+                    ))}
+                  </div>
+                )}
             </AnimatePresence>
+
+            {selectedDate && selectedDayFilteredEvents.length > 6 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-1"
+                onClick={() => setSelectedDayExpanded(prev => !prev)}
+              >
+                {selectedDayExpanded ? "접기" : `더 보기 (+${selectedDayFilteredEvents.length - 6})`}
+              </Button>
+            )}
 
             <div className="mt-6 border-t border-slate-200/60 dark:border-slate-700/60 pt-4 text-xs text-slate-500 dark:text-slate-400">
               카테고리 색상 설정은 “새 일정” 또는 “일정 수정” 팝업에서
@@ -817,7 +1112,7 @@ export function Schedule() {
       {/* Create Dialog */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent
-          className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl"
+          className="w-[min(96vw,1120px)] max-h-[90vh] p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -825,119 +1120,192 @@ export function Schedule() {
             }
           }}
         >
-          <DialogHeader>
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-200/70 dark:border-slate-700/70">
             <DialogTitle>새 일정 추가</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={createSchedule} className="space-y-4">
-            <div className="text-xs text-slate-500">
-              작성일: {new Date().toLocaleString()}
-            </div>
-            <div>
-              <Label>제목</Label>
-              <Input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div>
-              <Label>날짜</Label>
-              <Input
-                type="datetime-local"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div>
-              <Label>카테고리</Label>
-              <Select value={category || undefined} onValueChange={setCategory}>
-                <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
-                  <SelectValue placeholder="카테고리 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allCategories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <CategoryColorPanel
-              paletteName={paletteName}
-              onChangePaletteName={setPaletteName}
-              onSavePalette={savePalette}
-              sortedPalettes={sortedPalettes}
-              paletteEditing={paletteEditing}
-              paletteEditName={paletteEditName}
-              onChangePaletteEditName={setPaletteEditName}
-              dragPaletteName={dragPaletteName}
-              onDragStartPalette={setDragPaletteName}
-              onReorderPalette={reorderPalette}
-              onToggleFavorite={toggleFavoritePalette}
-              onApplyPalette={p => applyPaletteColors(p.colors)}
-              onSavePaletteName={savePaletteName}
-              onStartPaletteEdit={name => {
-                setPaletteEditing(name);
-                setPaletteEditName(name);
-              }}
-              onDeletePalette={name =>
-                setSavedPalettes(s => s.filter(sp => sp.name !== name))
-              }
-              presetPalettes={presetPalettes}
-              onApplyPreset={applyPaletteColors}
-              allCategories={allCategories}
-              categoryFilter={categoryFilter}
-              onChangeCategoryFilter={setCategoryFilter}
-              palettePulse={palettePulse}
-              visibleCategories={visibleCategories}
-              defaultCategories={defaultCategories}
-              categoryColors={categoryColors}
-              colorForCategory={colorForCategory}
-              renderHighlighted={renderHighlighted}
-              onChangeCategoryColor={(cat, color) =>
-                setCategoryColors(s => ({ ...s, [cat]: color }))
-              }
-              onResetCategoryColor={cat =>
-                setCategoryColors(s => {
-                  const next = { ...s };
-                  delete next[cat];
-                  return next;
-                })
-              }
-              onRemoveCustomCategory={removeCustomCategory}
-              newCategoryName={newCategoryName}
-              onChangeNewCategoryName={setNewCategoryName}
-              newCategoryColor={newCategoryColor}
-              onChangeNewCategoryColor={setNewCategoryColor}
-              onAddCategory={addCustomCategory}
-            />
-            <div>
-              <Label>메모</Label>
-              <Textarea
-                rows={3}
-                value={memo}
-                onChange={e => setMemo(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
+          <form onSubmit={createSchedule} className="space-y-0">
+            <div className="max-h-[calc(90vh-144px)] overflow-y-auto px-6 py-4 space-y-4">
+              <div className="text-xs text-slate-500">
+                작성일: {new Date().toLocaleString()}
+              </div>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label>제목</Label>
+                    <Input
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <Label>일정 유형</Label>
+                    <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
+                      <button
+                        type="button"
+                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                          createMode === "single"
+                            ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                            : "text-slate-500 dark:text-slate-300"
+                        }`}
+                        onClick={() => setCreateMode("single")}
+                      >
+                        단일 일정
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                          createMode === "range"
+                            ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                            : "text-slate-500 dark:text-slate-300"
+                        }`}
+                        onClick={() => setCreateMode("range")}
+                      >
+                        기간 일정
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>날짜</Label>
+                    {createMode === "single" ? (
+                      <Input
+                        type="datetime-local"
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs text-slate-500">시작일</Label>
+                          <Input
+                            type="datetime-local"
+                            value={rangeStartDate}
+                            onChange={e => setRangeStartDate(e.target.value)}
+                            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-slate-500">마감일</Label>
+                          <Input
+                            type="datetime-local"
+                            value={rangeEndDate}
+                            onChange={e => setRangeEndDate(e.target.value)}
+                            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label>메모</Label>
+                    <Textarea
+                      rows={6}
+                      value={memo}
+                      onChange={e => setMemo(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label>카테고리</Label>
+                    <Select value={category || undefined} onValueChange={setCategory}>
+                      <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                        <SelectValue placeholder="카테고리 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-3 bg-slate-50/70 dark:bg-slate-900/40">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200"
+                      onClick={() => setShowCreateCategoryPanel(v => !v)}
+                    >
+                      <span>카테고리 색상/팔레트 설정</span>
+                      <span>{showCreateCategoryPanel ? "접기" : "열기"}</span>
+                    </button>
+                    {showCreateCategoryPanel && (
+                      <div className="mt-3">
+                        <CategoryColorPanel
+                          paletteName={paletteName}
+                          onChangePaletteName={setPaletteName}
+                          onSavePalette={savePalette}
+                          sortedPalettes={sortedPalettes}
+                          paletteEditing={paletteEditing}
+                          paletteEditName={paletteEditName}
+                          onChangePaletteEditName={setPaletteEditName}
+                          dragPaletteName={dragPaletteName}
+                          onDragStartPalette={setDragPaletteName}
+                          onReorderPalette={reorderPalette}
+                          onToggleFavorite={toggleFavoritePalette}
+                          onApplyPalette={p => applyPaletteColors(p.colors)}
+                          onSavePaletteName={savePaletteName}
+                          onStartPaletteEdit={name => {
+                            setPaletteEditing(name);
+                            setPaletteEditName(name);
+                          }}
+                          onDeletePalette={name =>
+                            setSavedPalettes(s => s.filter(sp => sp.name !== name))
+                          }
+                          presetPalettes={presetPalettes}
+                          onApplyPreset={applyPaletteColors}
+                          allCategories={allCategories}
+                          categoryFilter={categoryFilter}
+                          onChangeCategoryFilter={setCategoryFilter}
+                          palettePulse={palettePulse}
+                          visibleCategories={visibleCategories}
+                          defaultCategories={defaultCategories}
+                          categoryColors={categoryColors}
+                          colorForCategory={colorForCategory}
+                          renderHighlighted={renderHighlighted}
+                          onChangeCategoryColor={(cat, color) =>
+                            setCategoryColors(s => ({ ...s, [cat]: color }))
+                          }
+                          onResetCategoryColor={cat =>
+                            setCategoryColors(s => {
+                              const next = { ...s };
+                              delete next[cat];
+                              return next;
+                            })
+                          }
+                          onRemoveCustomCategory={removeCustomCategory}
+                          newCategoryName={newCategoryName}
+                          onChangeNewCategoryName={setNewCategoryName}
+                          newCategoryColor={newCategoryColor}
+                          onChangeNewCategoryColor={setNewCategoryColor}
+                          onAddCategory={addCustomCategory}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-            {err && <p className="text-red-500 text-sm">{err}</p>}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setOpenCreate(false)}
-              >
-                취소
-              </Button>
-              <Button type="submit">추가</Button>
+              {err && <p className="text-red-500 text-sm">{err}</p>}
             </div>
-            <div className="text-xs text-slate-500">
-              단축키: ⌘/Ctrl+Enter 추가
+            <div className="px-6 py-3 border-t border-slate-200/70 dark:border-slate-700/70 bg-slate-50/60 dark:bg-slate-900/30">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500">단축키: ⌘/Ctrl+Enter 추가</div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => setOpenCreate(false)}
+                  >
+                    취소
+                  </Button>
+                  <Button type="submit">추가</Button>
+                </div>
+              </div>
             </div>
           </form>
         </DialogContent>
@@ -946,7 +1314,7 @@ export function Schedule() {
       {/* Edit Dialog */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
         <DialogContent
-          className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl"
+          className="w-[min(96vw,1120px)] max-h-[90vh] p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -954,119 +1322,192 @@ export function Schedule() {
             }
           }}
         >
-          <DialogHeader>
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-200/70 dark:border-slate-700/70">
             <DialogTitle>일정 수정</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={updateSchedule} className="space-y-4">
-            <div>
-              <Label>제목</Label>
-              <Input
-                value={editTitle}
-                onChange={e => setEditTitle(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div>
-              <Label>날짜</Label>
-              <Input
-                type="datetime-local"
-                value={editDate}
-                onChange={e => setEditDate(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div>
-              <Label>카테고리</Label>
-              <Select
-                value={editCategory || undefined}
-                onValueChange={setEditCategory}
-              >
-                <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
-                  <SelectValue placeholder="카테고리 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allCategories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <CategoryColorPanel
-              paletteName={paletteName}
-              onChangePaletteName={setPaletteName}
-              onSavePalette={savePalette}
-              sortedPalettes={sortedPalettes}
-              paletteEditing={paletteEditing}
-              paletteEditName={paletteEditName}
-              onChangePaletteEditName={setPaletteEditName}
-              dragPaletteName={dragPaletteName}
-              onDragStartPalette={setDragPaletteName}
-              onReorderPalette={reorderPalette}
-              onToggleFavorite={toggleFavoritePalette}
-              onApplyPalette={p => applyPaletteColors(p.colors)}
-              onSavePaletteName={savePaletteName}
-              onStartPaletteEdit={name => {
-                setPaletteEditing(name);
-                setPaletteEditName(name);
-              }}
-              onDeletePalette={name =>
-                setSavedPalettes(s => s.filter(sp => sp.name !== name))
-              }
-              presetPalettes={presetPalettes}
-              onApplyPreset={applyPaletteColors}
-              allCategories={allCategories}
-              categoryFilter={categoryFilter}
-              onChangeCategoryFilter={setCategoryFilter}
-              palettePulse={palettePulse}
-              visibleCategories={visibleCategories}
-              defaultCategories={defaultCategories}
-              categoryColors={categoryColors}
-              colorForCategory={colorForCategory}
-              renderHighlighted={renderHighlighted}
-              onChangeCategoryColor={(cat, color) =>
-                setCategoryColors(s => ({ ...s, [cat]: color }))
-              }
-              onResetCategoryColor={cat =>
-                setCategoryColors(s => {
-                  const next = { ...s };
-                  delete next[cat];
-                  return next;
-                })
-              }
-              onRemoveCustomCategory={removeCustomCategory}
-              newCategoryName={newCategoryName}
-              onChangeNewCategoryName={setNewCategoryName}
-              newCategoryColor={newCategoryColor}
-              onChangeNewCategoryColor={setNewCategoryColor}
-              onAddCategory={addCustomCategory}
-            />
-            <div>
-              <Label>메모</Label>
-              <Textarea
-                rows={3}
-                value={editMemo}
-                onChange={e => setEditMemo(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
+          <form onSubmit={updateSchedule} className="space-y-0">
+            <div className="max-h-[calc(90vh-144px)] overflow-y-auto px-6 py-4 space-y-4">
+              <div className="grid lg:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label>제목</Label>
+                    <Input
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <Label>일정 유형</Label>
+                    <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
+                      <button
+                        type="button"
+                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                          editMode === "single"
+                            ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                            : "text-slate-500 dark:text-slate-300"
+                        }`}
+                        onClick={() => setEditMode("single")}
+                      >
+                        단일 일정
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                          editMode === "range"
+                            ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                            : "text-slate-500 dark:text-slate-300"
+                        }`}
+                        onClick={() => setEditMode("range")}
+                      >
+                        기간 일정
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>날짜</Label>
+                    {editMode === "single" ? (
+                      <Input
+                        type="datetime-local"
+                        value={editDate}
+                        onChange={e => setEditDate(e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs text-slate-500">시작일</Label>
+                          <Input
+                            type="datetime-local"
+                            value={editRangeStartDate}
+                            onChange={e => setEditRangeStartDate(e.target.value)}
+                            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-slate-500">마감일</Label>
+                          <Input
+                            type="datetime-local"
+                            value={editRangeEndDate}
+                            onChange={e => setEditRangeEndDate(e.target.value)}
+                            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label>메모</Label>
+                    <Textarea
+                      rows={6}
+                      value={editMemo}
+                      onChange={e => setEditMemo(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label>카테고리</Label>
+                    <Select
+                      value={editCategory || undefined}
+                      onValueChange={setEditCategory}
+                    >
+                      <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                        <SelectValue placeholder="카테고리 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-3 bg-slate-50/70 dark:bg-slate-900/40">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200"
+                      onClick={() => setShowEditCategoryPanel(v => !v)}
+                    >
+                      <span>카테고리 색상/팔레트 설정</span>
+                      <span>{showEditCategoryPanel ? "접기" : "열기"}</span>
+                    </button>
+                    {showEditCategoryPanel && (
+                      <div className="mt-3">
+                        <CategoryColorPanel
+                          paletteName={paletteName}
+                          onChangePaletteName={setPaletteName}
+                          onSavePalette={savePalette}
+                          sortedPalettes={sortedPalettes}
+                          paletteEditing={paletteEditing}
+                          paletteEditName={paletteEditName}
+                          onChangePaletteEditName={setPaletteEditName}
+                          dragPaletteName={dragPaletteName}
+                          onDragStartPalette={setDragPaletteName}
+                          onReorderPalette={reorderPalette}
+                          onToggleFavorite={toggleFavoritePalette}
+                          onApplyPalette={p => applyPaletteColors(p.colors)}
+                          onSavePaletteName={savePaletteName}
+                          onStartPaletteEdit={name => {
+                            setPaletteEditing(name);
+                            setPaletteEditName(name);
+                          }}
+                          onDeletePalette={name =>
+                            setSavedPalettes(s => s.filter(sp => sp.name !== name))
+                          }
+                          presetPalettes={presetPalettes}
+                          onApplyPreset={applyPaletteColors}
+                          allCategories={allCategories}
+                          categoryFilter={categoryFilter}
+                          onChangeCategoryFilter={setCategoryFilter}
+                          palettePulse={palettePulse}
+                          visibleCategories={visibleCategories}
+                          defaultCategories={defaultCategories}
+                          categoryColors={categoryColors}
+                          colorForCategory={colorForCategory}
+                          renderHighlighted={renderHighlighted}
+                          onChangeCategoryColor={(cat, color) =>
+                            setCategoryColors(s => ({ ...s, [cat]: color }))
+                          }
+                          onResetCategoryColor={cat =>
+                            setCategoryColors(s => {
+                              const next = { ...s };
+                              delete next[cat];
+                              return next;
+                            })
+                          }
+                          onRemoveCustomCategory={removeCustomCategory}
+                          newCategoryName={newCategoryName}
+                          onChangeNewCategoryName={setNewCategoryName}
+                          newCategoryColor={newCategoryColor}
+                          onChangeNewCategoryColor={setNewCategoryColor}
+                          onAddCategory={addCustomCategory}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-            {err && <p className="text-red-500 text-sm">{err}</p>}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setOpenEdit(false)}
-              >
-                취소
-              </Button>
-              <Button type="submit">저장</Button>
+              {err && <p className="text-red-500 text-sm">{err}</p>}
             </div>
-            <div className="text-xs text-slate-500">
-              단축키: ⌘/Ctrl+Enter 저장
+            <div className="px-6 py-3 border-t border-slate-200/70 dark:border-slate-700/70 bg-slate-50/60 dark:bg-slate-900/30">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500">단축키: ⌘/Ctrl+Enter 저장</div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => setOpenEdit(false)}
+                  >
+                    취소
+                  </Button>
+                  <Button type="submit">저장</Button>
+                </div>
+              </div>
             </div>
           </form>
         </DialogContent>

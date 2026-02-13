@@ -5,21 +5,8 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import axios from "axios";
-import { LandingPage } from "./pages/LandingPage";
-import { LoginForm } from "./pages/LoginForm";
-import { SignupForm } from "./pages/SignupForm";
-import { ForgotPassword } from "./pages/ForgotPassword";
-import { GitHubAuth } from "./pages/GitHubAuth";
-import { ResetPassword } from "./pages/ResetPassword";
-import { Dashboard } from "./pages/Dashboard";
-import { ProjectForm } from "./pages/ProjectForm";
-import { Schedule } from "./pages/Schedule";
-import { Retrospective } from "./pages/Retrospective";
-import { TaskBoard } from "./pages/TaskBoard";
-import { AnimatedBackground } from "./components/AnimatedBackground";
-import { CodeRain } from "./components/CodeRain";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ThemeToggle } from "./components/ThemeToggle";
 import {
@@ -35,7 +22,57 @@ import {
 import { Button } from "./components/ui/button";
 import { sendResetPasswordMail, handleGitHubCallback } from "./services/auth";
 
+const LandingPage = lazy(() =>
+  import("./pages/LandingPage").then(m => ({ default: m.LandingPage })),
+);
+const LoginForm = lazy(() =>
+  import("./pages/LoginForm").then(m => ({ default: m.LoginForm })),
+);
+const SignupForm = lazy(() =>
+  import("./pages/SignupForm").then(m => ({ default: m.SignupForm })),
+);
+const ForgotPassword = lazy(() =>
+  import("./pages/ForgotPassword").then(m => ({ default: m.ForgotPassword })),
+);
+const GitHubAuth = lazy(() =>
+  import("./pages/GitHubAuth").then(m => ({ default: m.GitHubAuth })),
+);
+const ResetPassword = lazy(() =>
+  import("./pages/ResetPassword").then(m => ({ default: m.ResetPassword })),
+);
+const Dashboard = lazy(() =>
+  import("./pages/Dashboard").then(m => ({ default: m.Dashboard })),
+);
+const ProjectForm = lazy(() =>
+  import("./pages/ProjectForm").then(m => ({ default: m.ProjectForm })),
+);
+const Schedule = lazy(() =>
+  import("./pages/Schedule").then(m => ({ default: m.Schedule })),
+);
+const Retrospective = lazy(() =>
+  import("./pages/Retrospective").then(m => ({ default: m.Retrospective })),
+);
+const TaskBoard = lazy(() =>
+  import("./pages/TaskBoard").then(m => ({ default: m.TaskBoard })),
+);
+const AnimatedBackground = lazy(() =>
+  import("./components/AnimatedBackground").then(m => ({
+    default: m.AnimatedBackground,
+  })),
+);
+const CodeRain = lazy(() =>
+  import("./components/CodeRain").then(m => ({ default: m.CodeRain })),
+);
+
 const AUTH_TOKEN_KEY = "accessToken";
+
+function RouteLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-indigo-500/70 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 // Axios Authorization 헤더 설정
 axios.defaults.headers.common["Authorization"] = `Bearer ${localStorage.getItem(
@@ -362,10 +399,14 @@ function AuthPage() {
       </div>
 
       {/* Particle Network */}
-      <AnimatedBackground />
+      <Suspense fallback={null}>
+        <AnimatedBackground />
+      </Suspense>
 
       {/* Code Rain Effect */}
-      <CodeRain />
+      <Suspense fallback={null}>
+        <CodeRain />
+      </Suspense>
 
       <div className="relative min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-lg">
@@ -464,7 +505,14 @@ function AuthPage() {
                 </div>
 
                 {/* Form Content */}
-                <div className="relative">
+                <Suspense
+                  fallback={
+                    <div className="py-10 flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-indigo-500/70 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  }
+                >
+                  <div className="relative">
                   {/* 비밀번호 재설정 */}
                   {authMode === "reset-password" && (
                     <ResetPassword
@@ -515,7 +563,8 @@ function AuthPage() {
                       )}
                     </>
                   )}
-                </div>
+                  </div>
+                </Suspense>
               </div>
             </div>
           </div>
@@ -548,88 +597,90 @@ function AppContent() {
   }
 
   return (
-    <Routes>
-      {/* Landing Page */}
-      <Route
-        path="/"
-        element={<LandingPage onGetStarted={() => navigate("/auth")} />}
-      />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        {/* Landing Page */}
+        <Route
+          path="/"
+          element={<LandingPage onGetStarted={() => navigate("/auth")} />}
+        />
 
-      {/* Auth Page */}
-      <Route
-        path="/auth"
-        element={
-          <AuthRoute>
-            <AuthPage />
-          </AuthRoute>
-        }
-      />
+        {/* Auth Page */}
+        <Route
+          path="/auth"
+          element={
+            <AuthRoute>
+              <AuthPage />
+            </AuthRoute>
+          }
+        />
 
-      {/* Protected Routes with Layout */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Dashboard />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProjectForm />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:id"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProjectForm />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/tasks"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <TaskBoard />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/schedule"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Schedule />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/retrospective"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Retrospective />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected Routes with Layout */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ProjectForm />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:id"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ProjectForm />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <TaskBoard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/schedule"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Schedule />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/retrospective"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Retrospective />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Catch all - redirect to landing */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Catch all - redirect to landing */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

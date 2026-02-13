@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -279,9 +279,12 @@ export function Dashboard() {
   const [toast, setToast] = useState<{ message: string } | null>(null);
   const [openQuickTask, setOpenQuickTask] = useState(false);
   const [openQuickSchedule, setOpenQuickSchedule] = useState(false);
-  const [openQuickRetro, setOpenQuickRetro] = useState(false);
   const [openUpcoming, setOpenUpcoming] = useState(false);
   const [openCompletedTasks, setOpenCompletedTasks] = useState(false);
+  const [completedProjectId, setCompletedProjectId] = useState("all");
+  const [completedGroupByProject, setCompletedGroupByProject] = useState(true);
+  const [completedQueryInput, setCompletedQueryInput] = useState("");
+  const [completedQuery, setCompletedQuery] = useState("");
   const [openOverdueTasks, setOpenOverdueTasks] = useState(false);
   const [highlightProjects, setHighlightProjects] = useState(false);
   const projectsRef = React.useRef<HTMLDivElement | null>(null);
@@ -304,12 +307,15 @@ export function Dashboard() {
   const [quickTaskMemo, setQuickTaskMemo] = useState("");
 
   const [quickScheduleTitle, setQuickScheduleTitle] = useState("");
+  const [quickScheduleMode, setQuickScheduleMode] = useState<"single" | "range">(
+    "single"
+  );
   const [quickScheduleDate, setQuickScheduleDate] = useState("");
+  const [quickScheduleStartDate, setQuickScheduleStartDate] = useState("");
+  const [quickScheduleEndDate, setQuickScheduleEndDate] = useState("");
   const [quickScheduleCategory, setQuickScheduleCategory] = useState("회의");
   const [quickScheduleMemo, setQuickScheduleMemo] = useState("");
 
-  const [quickRetroProjectId, setQuickRetroProjectId] = useState("");
-  const [quickRetroContent, setQuickRetroContent] = useState("");
 
   const showToast = (message: string) => {
     setToast({ message });
@@ -424,20 +430,47 @@ export function Dashboard() {
       showToast("일정 제목을 입력해주세요.");
       return;
     }
-    if (!quickScheduleDate) {
+    if (quickScheduleMode === "single" && !quickScheduleDate) {
       showToast("일정을 선택해주세요.");
       return;
     }
+    if (quickScheduleMode === "range") {
+      if (!quickScheduleStartDate || !quickScheduleEndDate) {
+        showToast("시작일과 마감일을 입력해주세요.");
+        return;
+      }
+      if (
+        new Date(quickScheduleStartDate).getTime() >
+        new Date(quickScheduleEndDate).getTime()
+      ) {
+        showToast("마감일은 시작일 이후여야 합니다.");
+        return;
+      }
+    }
     try {
-      const isoDate = new Date(quickScheduleDate).toISOString();
+      const isoDate =
+        quickScheduleMode === "single"
+          ? new Date(quickScheduleDate).toISOString()
+          : new Date(quickScheduleStartDate).toISOString();
       await api.post("/api/schedules", {
         title: quickScheduleTitle,
         date: isoDate,
+        startDate:
+          quickScheduleMode === "range"
+            ? new Date(quickScheduleStartDate).toISOString()
+            : undefined,
+        endDate:
+          quickScheduleMode === "range"
+            ? new Date(quickScheduleEndDate).toISOString()
+            : undefined,
         category: quickScheduleCategory,
         memo: quickScheduleMemo || undefined,
       });
       setQuickScheduleTitle("");
+      setQuickScheduleMode("single");
       setQuickScheduleDate("");
+      setQuickScheduleStartDate("");
+      setQuickScheduleEndDate("");
       setQuickScheduleCategory("회의");
       setQuickScheduleMemo("");
       setOpenQuickSchedule(false);
@@ -445,27 +478,6 @@ export function Dashboard() {
       void loadDashboard();
     } catch (err: unknown) {
       showToast(getErrorMessage(err) || "일정 생성 실패");
-    }
-  };
-
-  const createQuickRetro = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickRetroContent.trim()) {
-      showToast("회고 내용을 입력해주세요.");
-      return;
-    }
-    try {
-      await api.post("/api/retros", {
-        projectId: quickRetroProjectId || undefined,
-        content: quickRetroContent,
-      });
-      setQuickRetroProjectId("");
-      setQuickRetroContent("");
-      setOpenQuickRetro(false);
-      showToast("회고가 작성되었습니다.");
-      void loadDashboard();
-    } catch (err: unknown) {
-      showToast(getErrorMessage(err) || "회고 생성 실패");
     }
   };
 
@@ -487,6 +499,42 @@ export function Dashboard() {
       showToast(getErrorMessage(err) || "일괄 변경 실패");
     }
   };
+
+  const completedTasks = useMemo(
+    () => rawTasks.filter(t => t.status === "done"),
+    [rawTasks]
+  );
+
+  const completedTasksFiltered = useMemo(
+    () =>
+      completedTasks.filter(
+        t =>
+          (completedProjectId === "all" || t.projectId === completedProjectId) &&
+          (!completedQuery ||
+            t.title.toLowerCase().includes(completedQuery.toLowerCase()))
+      ),
+    [completedProjectId, completedQuery, completedTasks]
+  );
+
+  const completedTasksByProject = useMemo<Map<string, Task[]>>(
+    () =>
+      completedTasksFiltered.reduce<Map<string, Task[]>>((acc, t) => {
+        const key = t.projectId ?? "unassigned";
+        if (!acc.has(key)) acc.set(key, []);
+        acc.get(key)!.push(t);
+        return acc;
+      }, new Map<string, Task[]>()),
+    [completedTasksFiltered]
+  );
+
+  const projectNameById = useMemo(
+    () =>
+      rawProjects.reduce<Record<string, string>>((acc, p) => {
+        acc[p._id] = p.title;
+        return acc;
+      }, {}),
+    [rawProjects]
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 relative overflow-hidden">
@@ -693,7 +741,7 @@ export function Dashboard() {
                         }
                         className="flex-1 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border-gray-200 dark:border-slate-600"
                       >
-                        회고 작성
+                        회고 보기
                       </Button>
                   </div>
                 </Card>
@@ -716,7 +764,13 @@ export function Dashboard() {
                 </h3>
                 <div className="space-y-3">
                   <Button
-                    onClick={() => setOpenQuickSchedule(true)}
+                    onClick={() => {
+                      setQuickScheduleMode("single");
+                      setQuickScheduleDate("");
+                      setQuickScheduleStartDate("");
+                      setQuickScheduleEndDate("");
+                      setOpenQuickSchedule(true);
+                    }}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#4F46E5]/5 hover:border-[#4F46E5]/20"
                   >
@@ -732,12 +786,12 @@ export function Dashboard() {
                     태스크 생성
                   </Button>
                   <Button
-                    onClick={() => setOpenQuickRetro(true)}
+                    onClick={() => navigate("/retrospective")}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#F59E0B]/5 hover:border-[#F59E0B]/20"
                   >
                     <FileText className="h-4 w-4 mr-2 text-[#F59E0B]" />
-                    회고 작성
+                    회고 보기
                   </Button>
                 </div>
               </Card>
@@ -1016,7 +1070,7 @@ export function Dashboard() {
       {/* Completed Tasks Dialog */}
       <Dialog open={openCompletedTasks} onOpenChange={setOpenCompletedTasks}>
         <DialogContent
-          className="sm:max-w-2xl"
+          className="sm:max-w-2xl max-h-[80vh] overflow-hidden"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               setOpenCompletedTasks(false);
@@ -1026,41 +1080,138 @@ export function Dashboard() {
           <DialogHeader>
             <DialogTitle>완료된 태스크</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            {rawTasks
-              .filter(t => t.status === "done")
-              .map(t => (
-                <div
-                  key={t._id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
-                >
-                  <div>
-                    <div className="font-medium text-slate-800 dark:text-white">
-                      {t.title}
-                    </div>
-                    {t.updatedAt && (
-                      <div className="text-xs text-slate-500">
-                        완료: {new Date(t.updatedAt).toLocaleString()}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      navigate(
-                        `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
-                      )
-                    }
-                  >
-                    보기
-                  </Button>
-                </div>
-              ))}
-            {rawTasks.filter(t => t.status === "done").length === 0 && (
-              <div className="text-sm text-slate-500">
-                완료된 태스크가 없습니다.
+          <div className="flex flex-col gap-3 h-full min-h-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-500">
+                완료된 태스크 {completedTasksFiltered.length}개 / 전체 {completedTasks.length}개
               </div>
-            )}
+              <button
+                className="text-xs underline text-slate-500"
+                onClick={() => setCompletedGroupByProject(v => !v)}
+              >
+                {completedGroupByProject ? "리스트 보기" : "프로젝트별 보기"}
+              </button>
+            </div>
+            <Select value={completedProjectId} onValueChange={setCompletedProjectId}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-60 overflow-y-auto">
+                <SelectItem value="all">전체 프로젝트</SelectItem>
+                {rawProjects.map(p => (
+                  <SelectItem key={p._id} value={p._id}>
+                    {p.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="제목으로 검색"
+              value={completedQueryInput}
+              onChange={e => setCompletedQueryInput(e.target.value)}
+              className="h-9"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => setCompletedQuery(completedQueryInput.trim())}
+              >
+                검색
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCompletedQueryInput("");
+                  setCompletedQuery("");
+                }}
+              >
+                초기화
+              </Button>
+            </div>
+            <div className="space-y-2 overflow-y-auto pr-1 max-h-[58vh]">
+              {completedGroupByProject
+                ? Array.from(completedTasksByProject.entries()).map(([pid, list]) => (
+                    <div key={pid} className="space-y-2">
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {pid === "unassigned"
+                          ? "프로젝트 미지정"
+                          : projectNameById[pid] ?? "알 수 없는 프로젝트"}
+                      </div>
+                      {list.map(t => (
+                        <div
+                          key={t._id}
+                          className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-800 dark:text-white truncate">
+                              {t.title}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              프로젝트:{" "}
+                              {t.projectId
+                                ? projectNameById[t.projectId] ?? "알 수 없는 프로젝트"
+                                : "프로젝트 미지정"}
+                            </div>
+                            {t.updatedAt && (
+                              <div className="text-xs text-slate-500">
+                                완료: {new Date(t.updatedAt).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              navigate(
+                                `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
+                              )
+                            }
+                          >
+                            보기
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                : completedTasksFiltered.map(t => (
+                    <div
+                      key={t._id}
+                      className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-800 dark:text-white truncate">
+                          {t.title}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          프로젝트:{" "}
+                          {t.projectId
+                            ? projectNameById[t.projectId] ?? "알 수 없는 프로젝트"
+                            : "프로젝트 미지정"}
+                        </div>
+                        {t.updatedAt && (
+                          <div className="text-xs text-slate-500">
+                            완료: {new Date(t.updatedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
+                          )
+                        }
+                      >
+                        보기
+                      </Button>
+                    </div>
+                  ))}
+              {completedTasksFiltered.length === 0 && (
+                <div className="text-sm text-slate-500">
+                  완료된 태스크가 없습니다.
+                </div>
+              )}
+            </div>
             <div className="text-xs text-slate-500">
               단축키: ⌘/Ctrl+Enter 닫기
             </div>
@@ -1416,6 +1567,7 @@ export function Dashboard() {
       {/* Quick Schedule Dialog */}
       <Dialog open={openQuickSchedule} onOpenChange={setOpenQuickSchedule}>
         <DialogContent
+          className="w-[min(94vw,720px)] max-h-[88vh] p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-700/70"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -1423,102 +1575,119 @@ export function Dashboard() {
             }
           }}
         >
-          <DialogHeader>
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-200/70 dark:border-slate-700/70">
             <DialogTitle>빠른 일정 추가</DialogTitle>
           </DialogHeader>
-          <form onSubmit={createQuickSchedule} className="space-y-4">
-            <Input
-              placeholder="일정 제목"
-              value={quickScheduleTitle}
-              onChange={e => setQuickScheduleTitle(e.target.value)}
-              className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-            />
-            <div>
-              <div className="text-xs text-slate-500 mb-1">날짜</div>
+          <form onSubmit={createQuickSchedule} className="space-y-0">
+            <div className="max-h-[calc(88vh-144px)] overflow-y-auto px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/80 dark:bg-slate-900/40">
+                <button
+                  type="button"
+                  className={`rounded-lg px-3 py-2 text-sm transition ${
+                    quickScheduleMode === "single"
+                      ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                      : "text-slate-500 dark:text-slate-300"
+                  }`}
+                  onClick={() => setQuickScheduleMode("single")}
+                >
+                  단일 일정
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-lg px-3 py-2 text-sm transition ${
+                    quickScheduleMode === "range"
+                      ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
+                      : "text-slate-500 dark:text-slate-300"
+                  }`}
+                  onClick={() => setQuickScheduleMode("range")}
+                >
+                  기간 일정
+                </button>
+              </div>
+
               <Input
-                type="date"
-                value={quickScheduleDate}
-                onChange={e => setQuickScheduleDate(e.target.value)}
+                placeholder="일정 제목"
+                value={quickScheduleTitle}
+                onChange={e => setQuickScheduleTitle(e.target.value)}
                 className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
               />
+
+              {quickScheduleMode === "single" ? (
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">날짜</div>
+                  <Input
+                    type="date"
+                    value={quickScheduleDate}
+                    onChange={e => setQuickScheduleDate(e.target.value)}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                  />
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">시작일</div>
+                    <Input
+                      type="date"
+                      value={quickScheduleStartDate}
+                      onChange={e => setQuickScheduleStartDate(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">마감일</div>
+                    <Input
+                      type="date"
+                      value={quickScheduleEndDate}
+                      onChange={e => setQuickScheduleEndDate(e.target.value)}
+                      className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Select
+                value={quickScheduleCategory}
+                onValueChange={setQuickScheduleCategory}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="카테고리 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="회의">회의</SelectItem>
+                  <SelectItem value="개발">개발</SelectItem>
+                  <SelectItem value="개인">개인</SelectItem>
+                </SelectContent>
+              </Select>
+              <div>
+                <div className="text-xs text-slate-500 mb-1">메모</div>
+                <Textarea
+                  rows={4}
+                  placeholder="메모를 입력하세요"
+                  value={quickScheduleMemo}
+                  onChange={e => setQuickScheduleMemo(e.target.value)}
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                />
+              </div>
             </div>
-            <Select
-              value={quickScheduleCategory}
-              onValueChange={setQuickScheduleCategory}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="카테고리 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="회의">회의</SelectItem>
-                <SelectItem value="개발">개발</SelectItem>
-                <SelectItem value="개인">개인</SelectItem>
-              </SelectContent>
-            </Select>
-            <div>
-              <div className="text-xs text-slate-500 mb-1">메모</div>
-              <Textarea
-                rows={3}
-                placeholder="메모를 입력하세요"
-                value={quickScheduleMemo}
-                onChange={e => setQuickScheduleMemo(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <Button type="submit">추가</Button>
-            <div className="text-xs text-slate-500">
-              단축키: ⌘/Ctrl+Enter 추가
+            <div className="px-6 py-3 border-t border-slate-200/70 dark:border-slate-700/70 bg-slate-50/60 dark:bg-slate-900/30">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500">단축키: ⌘/Ctrl+Enter 추가</div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpenQuickSchedule(false)}
+                  >
+                    취소
+                  </Button>
+                  <Button type="submit">추가</Button>
+                </div>
+              </div>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Quick Retro Dialog */}
-      <Dialog open={openQuickRetro} onOpenChange={setOpenQuickRetro}>
-        <DialogContent
-          onKeyDown={e => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              void createQuickRetro(e as any);
-            }
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>빠른 회고 작성</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={createQuickRetro} className="space-y-4">
-            <div>
-              <div className="text-xs text-slate-500 mb-1">프로젝트 (선택)</div>
-              <Select
-                value={quickRetroProjectId}
-                onValueChange={setQuickRetroProjectId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="프로젝트 선택" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60 overflow-y-auto">
-                  {rawProjects.map(p => (
-                    <SelectItem key={p._id} value={p._id}>
-                      {p.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Textarea
-              rows={5}
-              placeholder="회고 내용을 입력하세요"
-              value={quickRetroContent}
-              onChange={e => setQuickRetroContent(e.target.value)}
-              className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-            />
-            <Button type="submit">작성</Button>
-            <div className="text-xs text-slate-500">
-              단축키: ⌘/Ctrl+Enter 작성
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
