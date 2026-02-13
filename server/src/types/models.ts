@@ -14,15 +14,17 @@ export interface Project {
   description: string;
   category: string;
   priority: "낮음" | "보통" | "높음";
-  createdAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Retro {
   _id: string;
   userId: string;
-  projectId: string;
+  projectId?: string;
   content: string;
-  createdAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Schedule {
@@ -31,12 +33,17 @@ export interface Schedule {
   title: string;
   date: Date;
   category: string;
+  memo?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Task {
   _id: string;
   projectId: string;
   title: string;
-  status: "할 일" | "진행 중" | "완료";
-  dueDate: Date;
+  status: "todo" | "doing" | "done";
+  dueDate?: Date;
+  memo?: string;
+  createdAt?: Date;
 }
