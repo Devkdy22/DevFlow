@@ -12,7 +12,7 @@ import mongoose from "mongoose";
 const router = Router();
 
 // // 회고 생성
-// router.post("/", protect, createRetro);
+router.post("/", protect, createRetro);
 
 // // 프로젝트별 회고 조회
 // router.get("/project/:projectId", protect, getRetrosByProject);
