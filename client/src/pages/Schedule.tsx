@@ -24,6 +24,19 @@ import {
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { CategoryColorPanel } from "../components/schedule/CategoryColorPanel";
+import {
+  toIsoStringOrUndefined,
+  toLocalDateKey,
+  toLocalDateTimeInputValue,
+} from "../utils/dateTime";
 
 import { motion, AnimatePresence } from "motion/react";
 import { TechBackground } from "../components/TechBackground";
@@ -47,6 +60,149 @@ type Schedule = {
   memo?: string;
 };
 
+type SavedPalette = {
+  name: string;
+  colors: string[];
+  favorite?: boolean;
+  createdAt?: number;
+};
+
+const hslToHex = (hue: number, saturation: number, lightness: number) => {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const hPrime = hue / 60;
+  const x = chroma * (1 - Math.abs((hPrime % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hPrime >= 0 && hPrime < 1) {
+    r = chroma;
+    g = x;
+  } else if (hPrime < 2) {
+    r = x;
+    g = chroma;
+  } else if (hPrime < 3) {
+    g = chroma;
+    b = x;
+  } else if (hPrime < 4) {
+    g = x;
+    b = chroma;
+  } else if (hPrime < 5) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+
+  const m = l - chroma / 2;
+  const toHex = (channel: number) =>
+    Math.round((channel + m) * 255)
+      .toString(16)
+      .padStart(2, "0");
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+};
+
+const generateDistinctHex = (index: number) =>
+  hslToHex((index * 137.508) % 360, 72, 48);
+
+const parseStoredCategoryColors = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  const raw = localStorage.getItem("scheduleCategoryColors");
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.entries(parsed).reduce<Record<string, string>>(
+      (acc, [k, v]) => {
+        if (typeof k === "string" && typeof v === "string") {
+          acc[k] = v;
+        }
+        return acc;
+      },
+      {},
+    );
+  } catch {
+    return {};
+  }
+};
+
+const parseStoredPalettes = (): SavedPalette[] => {
+  if (typeof window === "undefined") return [];
+  const savedPalettesRaw = localStorage.getItem("scheduleSavedPalettes");
+  if (savedPalettesRaw) {
+    try {
+      const parsed = JSON.parse(savedPalettesRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (typeof parsed[0] === "string") {
+          return [
+            {
+              name: "내 팔레트",
+              colors: parsed,
+              favorite: false,
+              createdAt: Date.now(),
+            },
+          ];
+        }
+        return parsed
+          .filter(
+            (p: unknown) =>
+              p &&
+              typeof (p as Record<string, unknown>).name === "string" &&
+              Array.isArray((p as Record<string, unknown>).colors),
+          )
+          .map((p: unknown) => {
+            const item = p as Record<string, unknown>;
+            return {
+              name: item.name as string,
+              colors: item.colors as string[],
+              favorite: !!item.favorite,
+              createdAt: (item.createdAt as number) ?? Date.now(),
+            };
+          });
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  const legacySingle = localStorage.getItem("scheduleSavedPalette");
+  if (!legacySingle) return [];
+  try {
+    const parsed = JSON.parse(legacySingle);
+    if (!Array.isArray(parsed)) return [];
+    return [
+      {
+        name: "내 팔레트",
+        colors: parsed,
+        favorite: false,
+        createdAt: Date.now(),
+      },
+    ];
+  } catch {
+    return [];
+  }
+};
+
+const parseStoredStringArray = (key: string): string[] => {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(key);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(v => typeof v === "string");
+  } catch {
+    return [];
+  }
+};
+
 export function Schedule() {
   const [items, setItems] = useState<Schedule[]>([]);
   const [title, setTitle] = useState("");
@@ -57,7 +213,7 @@ export function Schedule() {
   const navigate = useNavigate();
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -66,16 +222,19 @@ export function Schedule() {
   const [editCategory, setEditCategory] = useState("");
   const [editMemo, setEditMemo] = useState("");
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>(
-    {}
+    parseStoredCategoryColors,
   );
   const [paletteName, setPaletteName] = useState("");
-  const [savedPalettes, setSavedPalettes] = useState<
-    { name: string; colors: string[]; favorite?: boolean; createdAt?: number }[]
-  >([]);
+  const [savedPalettes, setSavedPalettes] =
+    useState<SavedPalette[]>(parseStoredPalettes);
   const [paletteEditing, setPaletteEditing] = useState<string | null>(null);
   const [paletteEditName, setPaletteEditName] = useState("");
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
-  const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>(() =>
+    parseStoredStringArray("scheduleCustomCategories"),
+  );
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>(() =>
+    parseStoredStringArray("scheduleHiddenCategories"),
+  );
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#6366F1");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -100,122 +259,38 @@ export function Schedule() {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("scheduleCategoryColors");
-    if (saved) {
-      try {
-        setCategoryColors(JSON.parse(saved));
-      } catch {
-        setCategoryColors({});
-      }
-    }
-    const savedPalettesRaw = localStorage.getItem("scheduleSavedPalettes");
-    if (savedPalettesRaw) {
-      try {
-        const parsed = JSON.parse(savedPalettesRaw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          if (typeof parsed[0] === "string") {
-            setSavedPalettes([
-              {
-                name: "내 팔레트",
-                colors: parsed,
-                favorite: false,
-                createdAt: Date.now(),
-              },
-            ]);
-          } else {
-            const normalized = parsed
-              .filter(
-                (p: any) =>
-                  p &&
-                  typeof p.name === "string" &&
-                  Array.isArray(p.colors)
-              )
-              .map((p: any) => ({
-                name: p.name,
-                colors: p.colors,
-                favorite: !!p.favorite,
-                createdAt: p.createdAt ?? Date.now(),
-              }));
-            setSavedPalettes(normalized);
-          }
-        } else {
-          setSavedPalettes([]);
-        }
-      } catch {
-        setSavedPalettes([]);
-      }
-    }
-    const legacySingle = localStorage.getItem("scheduleSavedPalette");
-    if (legacySingle && !savedPalettesRaw) {
-      try {
-        const parsed = JSON.parse(legacySingle);
-        if (Array.isArray(parsed)) {
-          setSavedPalettes([
-            {
-              name: "내 팔레트",
-              colors: parsed,
-              favorite: false,
-              createdAt: Date.now(),
-            },
-          ]);
-        }
-      } catch {
-        // ignore legacy
-      }
-    }
-    const savedCustomRaw = localStorage.getItem("scheduleCustomCategories");
-    if (savedCustomRaw) {
-      try {
-        setCustomCategories(JSON.parse(savedCustomRaw));
-      } catch {
-        setCustomCategories([]);
-      }
-    }
-    const savedHiddenRaw = localStorage.getItem("scheduleHiddenCategories");
-    if (savedHiddenRaw) {
-      try {
-        setHiddenCategories(JSON.parse(savedHiddenRaw));
-      } catch {
-        setHiddenCategories([]);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem(
       "scheduleCategoryColors",
-      JSON.stringify(categoryColors)
+      JSON.stringify(categoryColors),
     );
   }, [categoryColors]);
 
   useEffect(() => {
     const keys = Object.keys(categoryColors).filter(
-      k => k && !defaultCategories.includes(k) && !hiddenCategories.includes(k)
+      k => k && !defaultCategories.includes(k) && !hiddenCategories.includes(k),
     );
     if (keys.length === 0) return;
-    setCustomCategories(prev =>
-      Array.from(new Set([...prev, ...keys]))
-    );
+    setCustomCategories(prev => Array.from(new Set([...prev, ...keys])));
   }, [categoryColors, defaultCategories, hiddenCategories]);
 
   useEffect(() => {
     localStorage.setItem(
       "scheduleSavedPalettes",
-      JSON.stringify(savedPalettes)
+      JSON.stringify(savedPalettes),
     );
   }, [savedPalettes]);
 
   useEffect(() => {
     localStorage.setItem(
       "scheduleCustomCategories",
-      JSON.stringify(customCategories)
+      JSON.stringify(customCategories),
     );
   }, [customCategories]);
 
   useEffect(() => {
     localStorage.setItem(
       "scheduleHiddenCategories",
-      JSON.stringify(hiddenCategories)
+      JSON.stringify(hiddenCategories),
     );
   }, [hiddenCategories]);
 
@@ -224,14 +299,17 @@ export function Schedule() {
       new Set(
         items
           .map(i => i.category || "")
-          .filter(c => c && !defaultCategories.includes(c))
-      )
+          .filter(c => c && !defaultCategories.includes(c)),
+      ),
     );
     if (fromItems.length === 0) return;
     setCustomCategories(prev =>
       Array.from(
-        new Set([...prev, ...fromItems.filter(c => !hiddenCategories.includes(c))])
-      )
+        new Set([
+          ...prev,
+          ...fromItems.filter(c => !hiddenCategories.includes(c)),
+        ]),
+      ),
     );
   }, [items, defaultCategories, hiddenCategories]);
 
@@ -239,7 +317,7 @@ export function Schedule() {
     e.preventDefault();
     setErr("");
     try {
-      const isoDate = date ? new Date(date).toISOString() : undefined;
+      const isoDate = toIsoStringOrUndefined(date);
       const res = await api.post("/api/schedules", {
         title,
         date: isoDate,
@@ -252,9 +330,7 @@ export function Schedule() {
       setCategory("");
       setMemo("");
       if (category && !defaultCategories.includes(category)) {
-        setCustomCategories(s =>
-          s.includes(category) ? s : [...s, category]
-        );
+        setCustomCategories(s => (s.includes(category) ? s : [...s, category]));
         setHiddenCategories(s => s.filter(c => c !== category));
       }
     } catch (error: unknown) {
@@ -275,7 +351,7 @@ export function Schedule() {
   const openEditDialog = (item: Schedule) => {
     setEditId(item._id);
     setEditTitle(item.title);
-    setEditDate(item.date ? item.date.slice(0, 16) : "");
+    setEditDate(toLocalDateTimeInputValue(item.date));
     setEditCategory(item.category ?? "");
     setEditMemo(item.memo ?? "");
     setOpenEdit(true);
@@ -286,7 +362,7 @@ export function Schedule() {
     if (!editId) return;
     setErr("");
     try {
-      const isoDate = editDate ? new Date(editDate).toISOString() : undefined;
+      const isoDate = toIsoStringOrUndefined(editDate);
       const res = await api.put(`/api/schedules/${editId}`, {
         title: editTitle,
         date: isoDate,
@@ -297,7 +373,7 @@ export function Schedule() {
       setOpenEdit(false);
       if (editCategory && !defaultCategories.includes(editCategory)) {
         setCustomCategories(s =>
-          s.includes(editCategory) ? s : [...s, editCategory]
+          s.includes(editCategory) ? s : [...s, editCategory],
         );
         setHiddenCategories(s => s.filter(c => c !== editCategory));
       }
@@ -321,15 +397,14 @@ export function Schedule() {
     const map: Record<string, Schedule[]> = {};
     items.forEach(item => {
       if (!item.date) return;
-      const key = item.date.split("T")[0];
+      const key = toLocalDateKey(new Date(item.date));
       map[key] = map[key] || [];
       map[key].push(item);
     });
     return map;
   }, [items]);
 
-  const getDateKey = (d: Date) => d.toISOString().split("T")[0];
-
+  const getDateKey = (d: Date) => toLocalDateKey(d);
 
   const allCategories = useMemo(() => {
     const set = new Set<string>();
@@ -345,7 +420,55 @@ export function Schedule() {
       if (!hiddenCategories.includes(k)) set.add(k);
     });
     return Array.from(set).sort();
-  }, [items, categoryColors, defaultCategories, customCategories, hiddenCategories]);
+  }, [
+    items,
+    categoryColors,
+    defaultCategories,
+    customCategories,
+    hiddenCategories,
+  ]);
+
+  const uniqueCategoryColors = useMemo(() => {
+    const resolved: Record<string, string> = {};
+    const used = new Set<string>();
+    let colorIndex = 0;
+
+    allCategories.forEach(categoryName => {
+      const preferred = categoryColors[categoryName];
+      if (preferred) {
+        const normalized = preferred.toUpperCase();
+        if (!used.has(normalized)) {
+          resolved[categoryName] = normalized;
+          used.add(normalized);
+          return;
+        }
+      }
+
+      let nextColor = "";
+      while (!nextColor || used.has(nextColor)) {
+        nextColor = generateDistinctHex(colorIndex);
+        colorIndex += 1;
+      }
+      resolved[categoryName] = nextColor;
+      used.add(nextColor);
+    });
+
+    return resolved;
+  }, [allCategories, categoryColors]);
+
+  useEffect(() => {
+    if (allCategories.length === 0) return;
+    let changed = false;
+    const next = { ...categoryColors };
+    allCategories.forEach(categoryName => {
+      const color = uniqueCategoryColors[categoryName];
+      if (next[categoryName] !== color) {
+        next[categoryName] = color;
+        changed = true;
+      }
+    });
+    if (changed) setCategoryColors(next);
+  }, [allCategories, categoryColors, uniqueCategoryColors]);
 
   const visibleCategories = useMemo(() => {
     const q = categoryFilter.trim().toLowerCase();
@@ -359,24 +482,14 @@ export function Schedule() {
     return [...fav, ...rest];
   }, [savedPalettes]);
 
-  const palette = [
-    "#6366F1",
-    "#22C55E",
-    "#F59E0B",
-    "#EF4444",
-    "#06B6D4",
-    "#8B5CF6",
-    "#14B8A6",
-  ];
-
   const colorForCategory = (category?: string) => {
     const key = (category || "기타").trim();
-    if (categoryColors[key]) return categoryColors[key];
+    if (uniqueCategoryColors[key]) return uniqueCategoryColors[key];
     let hash = 0;
     for (let i = 0; i < key.length; i += 1) {
-      hash = (hash * 31 + key.charCodeAt(i)) % palette.length;
+      hash = (hash * 31 + key.charCodeAt(i)) % 360;
     }
-    return palette[hash];
+    return hslToHex(hash, 72, 48);
   };
 
   const renderHighlighted = (name: string) => {
@@ -393,6 +506,76 @@ export function Schedule() {
         {name.slice(idx + q.length)}
       </>
     );
+  };
+
+  const applyPaletteColors = (colors: string[]) => {
+    if (colors.length === 0) return;
+    const next = { ...categoryColors };
+    allCategories.forEach((cat, idx) => {
+      next[cat] = colors[idx % colors.length];
+    });
+    setCategoryColors(next);
+    setPalettePulse(true);
+    window.setTimeout(() => setPalettePulse(false), 600);
+  };
+
+  const savePalette = () => {
+    const name = paletteName.trim();
+    if (!name) return;
+    const colors = allCategories.map(cat => colorForCategory(cat));
+    setSavedPalettes(s => [
+      ...s.filter(p => p.name !== name),
+      { name, colors, favorite: false, createdAt: Date.now() },
+    ]);
+    setPaletteName("");
+  };
+
+  const reorderPalette = (targetName: string) => {
+    if (!dragPaletteName || dragPaletteName === targetName) return;
+    setSavedPalettes(s => {
+      const list = [...s];
+      const from = list.findIndex(sp => sp.name === dragPaletteName);
+      const to = list.findIndex(sp => sp.name === targetName);
+      if (from === -1 || to === -1) return s;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return list;
+    });
+  };
+
+  const toggleFavoritePalette = (name: string) => {
+    setSavedPalettes(s =>
+      s.map(sp => (sp.name === name ? { ...sp, favorite: !sp.favorite } : sp)),
+    );
+  };
+
+  const savePaletteName = (originalName: string) => {
+    const name = paletteEditName.trim();
+    if (!name) return;
+    setSavedPalettes(s =>
+      s.map(sp => (sp.name === originalName ? { ...sp, name } : sp)),
+    );
+    setPaletteEditing(null);
+    setPaletteEditName("");
+  };
+
+  const removeCustomCategory = (cat: string) => {
+    setCategoryColors(s => {
+      const next = { ...s };
+      delete next[cat];
+      return next;
+    });
+    setCustomCategories(s => s.filter(c => c !== cat));
+    setHiddenCategories(s => (s.includes(cat) ? s : [...s, cat]));
+  };
+
+  const addCustomCategory = () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setCategoryColors(s => ({ ...s, [name]: newCategoryColor }));
+    setCustomCategories(s => (s.includes(name) ? s : [...s, name]));
+    setHiddenCategories(s => s.filter(c => c !== name));
+    setNewCategoryName("");
   };
 
   return (
@@ -485,7 +668,7 @@ export function Schedule() {
                 const key = getDateKey(dateObj);
                 const dayEvents = eventsByDate[key] || [];
                 const uniqueCategories = Array.from(
-                  new Set(dayEvents.map(e => e.category || "기타"))
+                  new Set(dayEvents.map(e => e.category || "기타")),
                 );
                 const isSelected =
                   selectedDate?.toDateString() === dateObj.toDateString();
@@ -496,7 +679,11 @@ export function Schedule() {
                   <motion.button
                     key={day}
                     onClick={() => setSelectedDate(dateObj)}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, delay: day * 0.01 }}
                     whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.96 }}
                     className={`aspect-square rounded-xl p-2 relative transition text-slate-800 dark:text-slate-100 ${
                       isSelected
                         ? "bg-indigo-500/20 ring-2 ring-indigo-500 shadow-lg"
@@ -546,21 +733,21 @@ export function Schedule() {
             )}
 
             <AnimatePresence>
-            {selectedDate &&
-              (eventsByDate[getDateKey(selectedDate)] || []).length === 0 && (
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  선택한 날짜에 일정이 없습니다.
-                </div>
-              )}
-            {selectedDate &&
-              (eventsByDate[getDateKey(selectedDate)] || []).map(e => (
-                <motion.div
-                  key={e._id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-3 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-sm cursor-pointer hover:shadow-md transition"
-                  onClick={() => openEditDialog(e)}
-                >
+              {selectedDate &&
+                (eventsByDate[getDateKey(selectedDate)] || []).length === 0 && (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    선택한 날짜에 일정이 없습니다.
+                  </div>
+                )}
+              {selectedDate &&
+                (eventsByDate[getDateKey(selectedDate)] || []).map(e => (
+                  <motion.div
+                    key={e._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-3 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-sm cursor-pointer hover:shadow-md transition"
+                    onClick={() => openEditDialog(e)}
+                  >
                     <div className="flex justify-between">
                       <div>
                         <strong>{e.title}</strong>
@@ -575,7 +762,7 @@ export function Schedule() {
                             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
                             style={{
                               backgroundColor: `${colorForCategory(
-                                e.category
+                                e.category,
                               )}22`,
                               color: colorForCategory(e.category),
                             }}
@@ -634,7 +821,7 @@ export function Schedule() {
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
-              void createSchedule(e as any);
+              void createSchedule(e as unknown as React.FormEvent);
             }
           }}
         >
@@ -665,325 +852,68 @@ export function Schedule() {
             </div>
             <div>
               <Label>카테고리</Label>
-              <Input
-                value={category}
-                onChange={e => setCategory(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-700/70 p-4 space-y-4 bg-gradient-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-950/60 shadow-inner">
-              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                카테고리 색상
-              </div>
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    placeholder="팔레트 이름"
-                    value={paletteName}
-                    onChange={e => setPaletteName(e.target.value)}
-                    className="h-9 w-40"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      const name = paletteName.trim();
-                      if (!name) return;
-                      const colors = allCategories.map(cat =>
-                        colorForCategory(cat)
-                      );
-                      setSavedPalettes(s => [
-                        ...s.filter(p => p.name !== name),
-                        { name, colors, favorite: false, createdAt: Date.now() },
-                      ]);
-                      setPaletteName("");
-                    }}
-                  >
-                    팔레트 저장
-                  </Button>
-                </div>
-
-                {sortedPalettes.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {sortedPalettes.map(p => (
-                      <div
-                        key={p.name}
-                        className="flex items-center gap-2 rounded-full border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70 px-3 py-1 text-xs"
-                        draggable
-                        onDragStart={() => setDragPaletteName(p.name)}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={() => {
-                          if (!dragPaletteName || dragPaletteName === p.name)
-                            return;
-                          setSavedPalettes(s => {
-                            const list = [...s];
-                            const from = list.findIndex(
-                              sp => sp.name === dragPaletteName
-                            );
-                            const to = list.findIndex(sp => sp.name === p.name);
-                            if (from === -1 || to === -1) return s;
-                            const [moved] = list.splice(from, 1);
-                            list.splice(to, 0, moved);
-                            return list;
-                          });
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className={`mr-1 ${p.favorite ? "text-amber-500" : "text-slate-400"}`}
-                          title="즐겨찾기"
-                          onClick={() =>
-                            setSavedPalettes(s =>
-                              s.map(sp =>
-                                sp.name === p.name
-                                  ? { ...sp, favorite: !sp.favorite }
-                                  : sp
-                              )
-                            )
-                          }
-                        >
-                          ★
-                        </button>
-                        {paletteEditing === p.name ? (
-                          <input
-                            className="bg-transparent outline-none w-20"
-                            value={paletteEditName}
-                            onChange={e => setPaletteEditName(e.target.value)}
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = { ...categoryColors };
-                              allCategories.forEach((cat, idx) => {
-                                next[cat] = p.colors[idx % p.colors.length];
-                              });
-                              setCategoryColors(next);
-                              setPalettePulse(true);
-                              window.setTimeout(() => setPalettePulse(false), 600);
-                            }}
-                          >
-                            {p.name}
-                          </button>
-                        )}
-                        {paletteEditing === p.name ? (
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-700"
-                            onClick={() => {
-                              const name = paletteEditName.trim();
-                              if (!name) return;
-                              setSavedPalettes(s =>
-                                s.map(sp =>
-                                  sp.name === p.name
-                                    ? { ...sp, name }
-                                    : sp
-                                )
-                              );
-                              setPaletteEditing(null);
-                              setPaletteEditName("");
-                            }}
-                          >
-                            저장
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-slate-600"
-                            onClick={() => {
-                              setPaletteEditing(p.name);
-                              setPaletteEditName(p.name);
-                            }}
-                          >
-                            편집
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSavedPalettes(s =>
-                              s.filter(sp => sp.name !== p.name)
-                            )
-                          }
-                          className="text-slate-400 hover:text-slate-600"
-                          title="삭제"
-                        >
-                          ✕
-                        </button>
-                        <span className="inline-flex items-center gap-1">
-                          {p.colors.slice(0, 3).map(c => (
-                            <span
-                              key={c}
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  {presetPalettes.map(p => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      className="px-2.5 py-1 rounded-full text-xs border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70"
-                      onClick={() => {
-                        const next = { ...categoryColors };
-                        allCategories.forEach((cat, idx) => {
-                          next[cat] = p.colors[idx % p.colors.length];
-                        });
-                        setCategoryColors(next);
-                        setPalettePulse(true);
-                        window.setTimeout(() => setPalettePulse(false), 600);
-                      }}
-                    >
-                      <span className="mr-2">{p.label}</span>
-                      <span className="inline-flex items-center gap-1">
-                        {p.colors.map(c => (
-                          <span
-                            key={c}
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </span>
-                    </button>
+              <Select value={category || undefined} onValueChange={setCategory}>
+                <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                  <SelectValue placeholder="카테고리 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
                   ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                {allCategories.length === 0 && (
-                  <div className="text-xs text-slate-500">
-                    아직 카테고리가 없습니다.
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2">
-                  <Input
-                    placeholder="카테고리 검색"
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                    className="h-8 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-                  />
-                  <button
-                    type="button"
-                    className="text-xs text-slate-500"
-                    onClick={() => setCategoryFilter("")}
-                  >
-                    초기화
-                  </button>
-                </div>
-                <div
-                  className={`grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1 ${
-                    palettePulse ? "animate-[paletteGlow_0.7s_ease-in-out_1] ring-2 ring-indigo-300/50 rounded-xl p-1" : ""
-                  }`}
-                >
-                  {visibleCategories.map(cat => {
-                    const isDefault = defaultCategories.includes(cat);
-                    const isCustom = !isDefault;
-                    const hasOverride = !!categoryColors[cat];
-                    return (
-                      <div
-                        key={cat}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/70 px-2 py-2"
-                      >
-                        <span
-                          className="inline-flex items-center gap-2 text-xs"
-                          style={{ color: colorForCategory(cat) }}
-                        >
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: colorForCategory(cat) }}
-                          />
-                          {renderHighlighted(cat)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="color"
-                            value={colorForCategory(cat)}
-                            onChange={e =>
-                              setCategoryColors(s => ({
-                                ...s,
-                                [cat]: e.target.value,
-                              }))
-                            }
-                            className="h-7 w-9 rounded border border-slate-200 dark:border-slate-700 bg-transparent"
-                          />
-                          {isDefault ? (
-                            hasOverride && (
-                              <button
-                                type="button"
-                                className="text-xs text-slate-500"
-                                onClick={() =>
-                                  setCategoryColors(s => {
-                                    const next = { ...s };
-                                    delete next[cat];
-                                    return next;
-                                  })
-                                }
-                              >
-                                ↺
-                              </button>
-                            )
-                          ) : isCustom ? (
-                            <button
-                              type="button"
-                              className="text-xs text-slate-500"
-                              onClick={e => {
-                                e.preventDefault();
-                                setCategoryColors(s => {
-                                  const next = { ...s };
-                                  delete next[cat];
-                                  return next;
-                                });
-                                setCustomCategories(s =>
-                                  s.filter(c => c !== cat)
-                                );
-                                setHiddenCategories(s =>
-                                  s.includes(cat) ? s : [...s, cat]
-                                );
-                              }}
-                            >
-                              ✕
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="새 카테고리"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-                />
-                <input
-                  type="color"
-                  value={newCategoryColor}
-                  onChange={e => setNewCategoryColor(e.target.value)}
-                  className="h-9 w-12 rounded border border-slate-200 dark:border-slate-700 bg-transparent"
-                />
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const name = newCategoryName.trim();
-                    if (!name) return;
-                    setCategoryColors(s => ({ ...s, [name]: newCategoryColor }));
-                    setCustomCategories(s =>
-                      s.includes(name) ? s : [...s, name]
-                    );
-                    setHiddenCategories(s => s.filter(c => c !== name));
-                    setNewCategoryName("");
-                  }}
-                >
-                  추가
-                </Button>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
+            <CategoryColorPanel
+              paletteName={paletteName}
+              onChangePaletteName={setPaletteName}
+              onSavePalette={savePalette}
+              sortedPalettes={sortedPalettes}
+              paletteEditing={paletteEditing}
+              paletteEditName={paletteEditName}
+              onChangePaletteEditName={setPaletteEditName}
+              dragPaletteName={dragPaletteName}
+              onDragStartPalette={setDragPaletteName}
+              onReorderPalette={reorderPalette}
+              onToggleFavorite={toggleFavoritePalette}
+              onApplyPalette={p => applyPaletteColors(p.colors)}
+              onSavePaletteName={savePaletteName}
+              onStartPaletteEdit={name => {
+                setPaletteEditing(name);
+                setPaletteEditName(name);
+              }}
+              onDeletePalette={name =>
+                setSavedPalettes(s => s.filter(sp => sp.name !== name))
+              }
+              presetPalettes={presetPalettes}
+              onApplyPreset={applyPaletteColors}
+              allCategories={allCategories}
+              categoryFilter={categoryFilter}
+              onChangeCategoryFilter={setCategoryFilter}
+              palettePulse={palettePulse}
+              visibleCategories={visibleCategories}
+              defaultCategories={defaultCategories}
+              categoryColors={categoryColors}
+              colorForCategory={colorForCategory}
+              renderHighlighted={renderHighlighted}
+              onChangeCategoryColor={(cat, color) =>
+                setCategoryColors(s => ({ ...s, [cat]: color }))
+              }
+              onResetCategoryColor={cat =>
+                setCategoryColors(s => {
+                  const next = { ...s };
+                  delete next[cat];
+                  return next;
+                })
+              }
+              onRemoveCustomCategory={removeCustomCategory}
+              newCategoryName={newCategoryName}
+              onChangeNewCategoryName={setNewCategoryName}
+              newCategoryColor={newCategoryColor}
+              onChangeNewCategoryColor={setNewCategoryColor}
+              onAddCategory={addCustomCategory}
+            />
             <div>
               <Label>메모</Label>
               <Textarea
@@ -1020,7 +950,7 @@ export function Schedule() {
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
-              void updateSchedule(e as any);
+              void updateSchedule(e as unknown as React.FormEvent);
             }
           }}
         >
@@ -1048,323 +978,71 @@ export function Schedule() {
             </div>
             <div>
               <Label>카테고리</Label>
-              <Input
-                value={editCategory}
-                onChange={e => setEditCategory(e.target.value)}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              />
-            </div>
-            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-700/70 p-4 space-y-4 bg-gradient-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-950/60 shadow-inner">
-              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                카테고리 색상
-              </div>
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    placeholder="팔레트 이름"
-                    value={paletteName}
-                    onChange={e => setPaletteName(e.target.value)}
-                    className="h-9 w-40"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      const name = paletteName.trim();
-                      if (!name) return;
-                      const colors = allCategories.map(cat =>
-                        colorForCategory(cat)
-                      );
-                      setSavedPalettes(s => [
-                        ...s.filter(p => p.name !== name),
-                        { name, colors, favorite: false, createdAt: Date.now() },
-                      ]);
-                      setPaletteName("");
-                    }}
-                  >
-                    팔레트 저장
-                  </Button>
-                </div>
-
-                {sortedPalettes.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {sortedPalettes.map(p => (
-                      <div
-                        key={p.name}
-                        className="flex items-center gap-2 rounded-full border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70 px-3 py-1 text-xs"
-                        draggable
-                        onDragStart={() => setDragPaletteName(p.name)}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={() => {
-                          if (!dragPaletteName || dragPaletteName === p.name)
-                            return;
-                          setSavedPalettes(s => {
-                            const list = [...s];
-                            const from = list.findIndex(
-                              sp => sp.name === dragPaletteName
-                            );
-                            const to = list.findIndex(sp => sp.name === p.name);
-                            if (from === -1 || to === -1) return s;
-                            const [moved] = list.splice(from, 1);
-                            list.splice(to, 0, moved);
-                            return list;
-                          });
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className={`mr-1 ${p.favorite ? "text-amber-500" : "text-slate-400"}`}
-                          title="즐겨찾기"
-                          onClick={() =>
-                            setSavedPalettes(s =>
-                              s.map(sp =>
-                                sp.name === p.name
-                                  ? { ...sp, favorite: !sp.favorite }
-                                  : sp
-                              )
-                            )
-                          }
-                        >
-                          ★
-                        </button>
-                        {paletteEditing === p.name ? (
-                          <input
-                            className="bg-transparent outline-none w-20"
-                            value={paletteEditName}
-                            onChange={e => setPaletteEditName(e.target.value)}
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = { ...categoryColors };
-                              allCategories.forEach((cat, idx) => {
-                                next[cat] = p.colors[idx % p.colors.length];
-                              });
-                              setCategoryColors(next);
-                              setPalettePulse(true);
-                              window.setTimeout(() => setPalettePulse(false), 600);
-                            }}
-                          >
-                            {p.name}
-                          </button>
-                        )}
-                        {paletteEditing === p.name ? (
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-700"
-                            onClick={() => {
-                              const name = paletteEditName.trim();
-                              if (!name) return;
-                              setSavedPalettes(s =>
-                                s.map(sp =>
-                                  sp.name === p.name
-                                    ? { ...sp, name }
-                                    : sp
-                                )
-                              );
-                              setPaletteEditing(null);
-                              setPaletteEditName("");
-                            }}
-                          >
-                            저장
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="text-slate-400 hover:text-slate-600"
-                            onClick={() => {
-                              setPaletteEditing(p.name);
-                              setPaletteEditName(p.name);
-                            }}
-                          >
-                            편집
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSavedPalettes(s =>
-                              s.filter(sp => sp.name !== p.name)
-                            )
-                          }
-                          className="text-slate-400 hover:text-slate-600"
-                          title="삭제"
-                        >
-                          ✕
-                        </button>
-                        <span className="inline-flex items-center gap-1">
-                          {p.colors.slice(0, 3).map(c => (
-                            <span
-                              key={c}
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  {presetPalettes.map(p => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      className="px-2.5 py-1 rounded-full text-xs border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70"
-                      onClick={() => {
-                        const next = { ...categoryColors };
-                        allCategories.forEach((cat, idx) => {
-                          next[cat] = p.colors[idx % p.colors.length];
-                        });
-                        setCategoryColors(next);
-                      }}
-                    >
-                      <span className="mr-2">{p.label}</span>
-                      <span className="inline-flex items-center gap-1">
-                        {p.colors.map(c => (
-                          <span
-                            key={c}
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </span>
-                    </button>
+              <Select
+                value={editCategory || undefined}
+                onValueChange={setEditCategory}
+              >
+                <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                  <SelectValue placeholder="카테고리 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
                   ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                {allCategories.length === 0 && (
-                  <div className="text-xs text-slate-500">
-                    아직 카테고리가 없습니다.
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2">
-                  <Input
-                    placeholder="카테고리 검색"
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                    className="h-8 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-                  />
-                  <button
-                    type="button"
-                    className="text-xs text-slate-500"
-                    onClick={() => setCategoryFilter("")}
-                  >
-                    초기화
-                  </button>
-                </div>
-                <div
-                  className={`grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1 ${
-                    palettePulse ? "animate-[paletteGlow_0.7s_ease-in-out_1] ring-2 ring-indigo-300/50 rounded-xl p-1" : ""
-                  }`}
-                >
-                  {visibleCategories.map(cat => {
-                    const isDefault = defaultCategories.includes(cat);
-                    const isCustom = !isDefault;
-                    const hasOverride = !!categoryColors[cat];
-                    return (
-                      <div
-                        key={cat}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/70 px-2 py-2"
-                      >
-                        <span
-                          className="inline-flex items-center gap-2 text-xs"
-                          style={{ color: colorForCategory(cat) }}
-                        >
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: colorForCategory(cat) }}
-                          />
-                          {renderHighlighted(cat)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="color"
-                            value={colorForCategory(cat)}
-                            onChange={e =>
-                              setCategoryColors(s => ({
-                                ...s,
-                                [cat]: e.target.value,
-                              }))
-                            }
-                            className="h-7 w-9 rounded border border-slate-200 dark:border-slate-700 bg-transparent"
-                          />
-                          {isDefault ? (
-                            hasOverride && (
-                              <button
-                                type="button"
-                                className="text-xs text-slate-500"
-                                onClick={() =>
-                                  setCategoryColors(s => {
-                                    const next = { ...s };
-                                    delete next[cat];
-                                    return next;
-                                  })
-                                }
-                              >
-                                ↺
-                              </button>
-                            )
-                          ) : isCustom ? (
-                            <button
-                              type="button"
-                              className="text-xs text-slate-500"
-                              onClick={e => {
-                                e.preventDefault();
-                                setCategoryColors(s => {
-                                  const next = { ...s };
-                                  delete next[cat];
-                                  return next;
-                                });
-                                setCustomCategories(s =>
-                                  s.filter(c => c !== cat)
-                                );
-                                setHiddenCategories(s =>
-                                  s.includes(cat) ? s : [...s, cat]
-                                );
-                              }}
-                            >
-                              ✕
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="새 카테고리"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-                />
-                <input
-                  type="color"
-                  value={newCategoryColor}
-                  onChange={e => setNewCategoryColor(e.target.value)}
-                  className="h-9 w-12 rounded border border-slate-200 dark:border-slate-700 bg-transparent"
-                />
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const name = newCategoryName.trim();
-                    if (!name) return;
-                    setCategoryColors(s => ({ ...s, [name]: newCategoryColor }));
-                    setCustomCategories(s =>
-                      s.includes(name) ? s : [...s, name]
-                    );
-                    setHiddenCategories(s => s.filter(c => c !== name));
-                    setNewCategoryName("");
-                  }}
-                >
-                  추가
-                </Button>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
+            <CategoryColorPanel
+              paletteName={paletteName}
+              onChangePaletteName={setPaletteName}
+              onSavePalette={savePalette}
+              sortedPalettes={sortedPalettes}
+              paletteEditing={paletteEditing}
+              paletteEditName={paletteEditName}
+              onChangePaletteEditName={setPaletteEditName}
+              dragPaletteName={dragPaletteName}
+              onDragStartPalette={setDragPaletteName}
+              onReorderPalette={reorderPalette}
+              onToggleFavorite={toggleFavoritePalette}
+              onApplyPalette={p => applyPaletteColors(p.colors)}
+              onSavePaletteName={savePaletteName}
+              onStartPaletteEdit={name => {
+                setPaletteEditing(name);
+                setPaletteEditName(name);
+              }}
+              onDeletePalette={name =>
+                setSavedPalettes(s => s.filter(sp => sp.name !== name))
+              }
+              presetPalettes={presetPalettes}
+              onApplyPreset={applyPaletteColors}
+              allCategories={allCategories}
+              categoryFilter={categoryFilter}
+              onChangeCategoryFilter={setCategoryFilter}
+              palettePulse={palettePulse}
+              visibleCategories={visibleCategories}
+              defaultCategories={defaultCategories}
+              categoryColors={categoryColors}
+              colorForCategory={colorForCategory}
+              renderHighlighted={renderHighlighted}
+              onChangeCategoryColor={(cat, color) =>
+                setCategoryColors(s => ({ ...s, [cat]: color }))
+              }
+              onResetCategoryColor={cat =>
+                setCategoryColors(s => {
+                  const next = { ...s };
+                  delete next[cat];
+                  return next;
+                })
+              }
+              onRemoveCustomCategory={removeCustomCategory}
+              newCategoryName={newCategoryName}
+              onChangeNewCategoryName={setNewCategoryName}
+              newCategoryColor={newCategoryColor}
+              onChangeNewCategoryColor={setNewCategoryColor}
+              onAddCategory={addCustomCategory}
+            />
             <div>
               <Label>메모</Label>
               <Textarea
