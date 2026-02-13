@@ -5,13 +5,20 @@ export interface ISchedule extends Document {
   title: string;
   date: Date;
   category: string;
+  memo?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const ScheduleSchema = new Schema<ISchedule>({
-  userId: { type: String, required: true },
-  title: { type: String, required: true },
-  date: { type: Date, required: true },
-  category: { type: String, required: true },
-});
+const ScheduleSchema = new Schema<ISchedule>(
+  {
+    userId: { type: String, required: true },
+    title: { type: String, required: true },
+    date: { type: Date, required: true },
+    category: { type: String, required: true },
+    memo: { type: String },
+  },
+  { timestamps: true }
+);
 
 export default mongoose.model<ISchedule>("Schedule", ScheduleSchema);
