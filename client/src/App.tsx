@@ -587,6 +587,16 @@ function AppContent() {
         }
       />
       <Route
+        path="/projects/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ProjectForm />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/tasks"
         element={
           <ProtectedRoute>
