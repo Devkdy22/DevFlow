@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 // 회고 생성
 export const createRetro = async (req: Request, res: Response) => {
   try {
-    const payload = { ...req.body, userId: (req as any).user._id };
+    const payload = { ...req.body, userId: (req as any).user?.id };
     const retro = new Retro(payload);
     await retro.save();
     res.status(201).json(retro);
