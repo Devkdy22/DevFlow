@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -15,6 +15,21 @@ import {
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { TechBackground } from "../components/TechBackground";
 import { motion } from "motion/react";
 import api from "../services/api";
@@ -113,29 +128,14 @@ function buildDashboardProjects(
 function buildStats(
   projects: DashboardProject[],
   tasks: Task[],
-  schedules: Schedule[]
+  upcomingTaskDeadlines: number,
+  upcomingScheduleDeadlines: number
 ): StatCard[] {
   const totalProjects = projects.length;
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(
     t => t.status === "done" || t.status === "완료"
   ).length;
-
-  const now = new Date();
-  const in7days = new Date(now);
-  in7days.setDate(now.getDate() + 7);
-
-  const upcomingTaskDeadlines = tasks.filter(t => {
-    if (!t.dueDate) return false;
-    const d = new Date(t.dueDate);
-    return d >= now && d <= in7days;
-  }).length;
-
-  const upcomingScheduleDeadlines = schedules.filter(s => {
-    if (!s.date) return false;
-    const d = new Date(s.date);
-    return d >= now && d <= in7days;
-  }).length;
 
   const upcomingDeadlines = upcomingTaskDeadlines + upcomingScheduleDeadlines;
 
@@ -162,7 +162,7 @@ function buildStats(
       value: String(upcomingDeadlines),
       icon: Clock,
       color: "from-[#F59E0B] to-[#EF4444]",
-      change: "7일 이내",
+      change: `태스크 ${upcomingTaskDeadlines}개 · 일정 ${upcomingScheduleDeadlines}개 (7일 이내)`,
     },
     {
       label: "전체 생산성",
@@ -190,7 +190,33 @@ function formatRelativeTime(iso: string): string {
   return `${diffDays}일 전`;
 }
 
-function buildActivities(projects: Project[], retros: Retro[]): Activity[] {
+function getUpcomingCounts(tasks: Task[], schedules: Schedule[]) {
+  const now = new Date();
+  const in7days = new Date(now);
+  in7days.setDate(now.getDate() + 7);
+
+  const upcomingTaskDeadlines = tasks.filter(t => {
+    if (!t.dueDate) return false;
+    const d = new Date(t.dueDate);
+    return d >= now && d <= in7days;
+  }).length;
+
+  const upcomingScheduleDeadlines = schedules.filter(s => {
+    if (!s.date) return false;
+    const d = new Date(s.date);
+    return d >= now && d <= in7days;
+  }).length;
+
+  return { upcomingTaskDeadlines, upcomingScheduleDeadlines };
+}
+
+function buildActivities(
+  projects: Project[],
+  retros: Retro[]
+): Activity[] {
+  const projectNameMap = new Map<string, string>();
+  projects.forEach(p => projectNameMap.set(p._id, p.title));
+
   const projectActivities: Activity[] = projects
     .filter(p => p.createdAt)
     .sort(
@@ -216,8 +242,10 @@ function buildActivities(projects: Project[], retros: Retro[]): Activity[] {
     .slice(0, 3)
     .map(r => ({
       type: "retrospective",
-      title: "스프린트 회고 작성",
-      project: r.projectId,
+      title: r.content.length > 28 ? `${r.content.slice(0, 28)}…` : r.content,
+      project: r.projectId
+        ? projectNameMap.get(r.projectId) ?? "알 수 없는 프로젝트"
+        : "프로젝트 미지정",
       time: formatRelativeTime(r.createdAt as string),
     }));
 
@@ -241,67 +269,222 @@ export function Dashboard() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [stats, setStats] = useState<StatCard[]>([]);
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+  const [rawProjects, setRawProjects] = useState<Project[]>([]);
+  const [rawTasks, setRawTasks] = useState<Task[]>([]);
+  const [rawSchedules, setRawSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState<{ message: string } | null>(null);
+  const [openQuickTask, setOpenQuickTask] = useState(false);
+  const [openQuickSchedule, setOpenQuickSchedule] = useState(false);
+  const [openQuickRetro, setOpenQuickRetro] = useState(false);
+  const [openUpcoming, setOpenUpcoming] = useState(false);
+  const [openCompletedTasks, setOpenCompletedTasks] = useState(false);
+  const [openOverdueTasks, setOpenOverdueTasks] = useState(false);
+  const [highlightProjects, setHighlightProjects] = useState(false);
+  const projectsRef = React.useRef<HTMLDivElement | null>(null);
+  const [overdueSelectedIds, setOverdueSelectedIds] = useState<string[]>([]);
+  const [overdueStatus, setOverdueStatus] = useState<"todo" | "doing" | "done">(
+    "doing"
+  );
+  const [overdueQuery, setOverdueQuery] = useState("");
+  const [overdueFilter, setOverdueFilter] = useState<
+    "all" | "todo" | "doing"
+  >("all");
+  const [overdueProjectId, setOverdueProjectId] = useState("all");
+
+  const [quickTaskTitle, setQuickTaskTitle] = useState("");
+  const [quickTaskProjectId, setQuickTaskProjectId] = useState("");
+  const [quickTaskStatus, setQuickTaskStatus] = useState<
+    "todo" | "doing" | "done"
+  >("todo");
+  const [quickTaskDueDate, setQuickTaskDueDate] = useState("");
+  const [quickTaskMemo, setQuickTaskMemo] = useState("");
+
+  const [quickScheduleTitle, setQuickScheduleTitle] = useState("");
+  const [quickScheduleDate, setQuickScheduleDate] = useState("");
+  const [quickScheduleCategory, setQuickScheduleCategory] = useState("회의");
+  const [quickScheduleMemo, setQuickScheduleMemo] = useState("");
+
+  const [quickRetroProjectId, setQuickRetroProjectId] = useState("");
+  const [quickRetroContent, setQuickRetroContent] = useState("");
+
+  const showToast = (message: string) => {
+    setToast({ message });
+    window.clearTimeout((showToast as any)._t);
+    (showToast as any)._t = window.setTimeout(() => setToast(null), 2400);
+  };
+
+  const scrollToProjects = () => {
+    if (!projectsRef.current) return;
+    projectsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    setHighlightProjects(true);
+    window.setTimeout(() => setHighlightProjects(false), 1200);
+  };
+
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [projectsRes, tasksRes, retrosRes, schedulesRes] =
+        await Promise.all([
+          api.get<Project[]>("/api/projects"),
+          api.get<Task[]>("/api/tasks"),
+          api.get<Retro[]>("/api/retros"),
+          api.get<Schedule[]>("/api/schedules"),
+        ]);
+
+      const projectsData = projectsRes.data ?? [];
+      const tasksData = tasksRes.data ?? [];
+      const retrosData = retrosRes.data ?? [];
+      const schedulesData = schedulesRes.data ?? [];
+
+      const dashboardProjects = buildDashboardProjects(
+        projectsData,
+        tasksData
+      );
+      const { upcomingTaskDeadlines, upcomingScheduleDeadlines } =
+        getUpcomingCounts(tasksData, schedulesData);
+      const dashboardStats = buildStats(
+        dashboardProjects,
+        tasksData,
+        upcomingTaskDeadlines,
+        upcomingScheduleDeadlines
+      );
+      const activities = buildActivities(projectsData, retrosData);
+
+      setProjects(dashboardProjects);
+      setStats(dashboardStats);
+      setRecentActivities(activities);
+      setRawProjects(projectsData);
+      setRawTasks(tasksData);
+      setRawSchedules(schedulesData);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError("대시보드 데이터를 불러오려면 로그인이 필요합니다.");
+      } else {
+        setError(
+          getErrorMessage(err) || "대시보드 데이터를 불러오지 못했습니다."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [projectsRes, tasksRes, retrosRes, schedulesRes] =
-          await Promise.all([
-            api.get<Project[]>("/api/projects"),
-            api.get<Task[]>("/api/tasks"),
-            api.get<Retro[]>("/api/retros"),
-            api.get<Schedule[]>("/api/schedules"),
-          ]);
-
-        if (cancelled) return;
-
-        const projectsData = projectsRes.data ?? [];
-        const tasksData = tasksRes.data ?? [];
-        const retrosData = retrosRes.data ?? [];
-        const schedulesData = schedulesRes.data ?? [];
-
-        const dashboardProjects = buildDashboardProjects(
-          projectsData,
-          tasksData
-        );
-        const dashboardStats = buildStats(
-          dashboardProjects,
-          tasksData,
-          schedulesData
-        );
-        const activities = buildActivities(projectsData, retrosData);
-
-        setProjects(dashboardProjects);
-        setStats(dashboardStats);
-        setRecentActivities(activities);
-      } catch (err: unknown) {
-        if (axios.isAxiosError(err) && err.response?.status === 401) {
-          setError("대시보드 데이터를 불러오려면 로그인이 필요합니다.");
-        } else {
-          setError(
-            getErrorMessage(err) || "대시보드 데이터를 불러오지 못했습니다."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-
+    if (cancelled) return;
+    void loadDashboard();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadDashboard]);
+
+  const createQuickTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTaskProjectId) {
+      showToast("프로젝트를 선택해주세요.");
+      return;
+    }
+    if (!quickTaskTitle.trim()) {
+      showToast("태스크 제목을 입력해주세요.");
+      return;
+    }
+    try {
+      const isoDue = quickTaskDueDate
+        ? new Date(quickTaskDueDate).toISOString()
+        : undefined;
+      await api.post("/api/tasks", {
+        title: quickTaskTitle,
+        projectId: quickTaskProjectId,
+        status: quickTaskStatus,
+        dueDate: isoDue,
+        memo: quickTaskMemo || undefined,
+      });
+      setQuickTaskTitle("");
+      setQuickTaskProjectId("");
+      setQuickTaskStatus("todo");
+      setQuickTaskDueDate("");
+      setQuickTaskMemo("");
+      setOpenQuickTask(false);
+      showToast("태스크가 생성되었습니다.");
+      void loadDashboard();
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err) || "태스크 생성 실패");
+    }
+  };
+
+  const createQuickSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickScheduleTitle.trim()) {
+      showToast("일정 제목을 입력해주세요.");
+      return;
+    }
+    if (!quickScheduleDate) {
+      showToast("일정을 선택해주세요.");
+      return;
+    }
+    try {
+      const isoDate = new Date(quickScheduleDate).toISOString();
+      await api.post("/api/schedules", {
+        title: quickScheduleTitle,
+        date: isoDate,
+        category: quickScheduleCategory,
+        memo: quickScheduleMemo || undefined,
+      });
+      setQuickScheduleTitle("");
+      setQuickScheduleDate("");
+      setQuickScheduleCategory("회의");
+      setQuickScheduleMemo("");
+      setOpenQuickSchedule(false);
+      showToast("일정이 추가되었습니다.");
+      void loadDashboard();
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err) || "일정 생성 실패");
+    }
+  };
+
+  const createQuickRetro = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickRetroContent.trim()) {
+      showToast("회고 내용을 입력해주세요.");
+      return;
+    }
+    try {
+      await api.post("/api/retros", {
+        projectId: quickRetroProjectId || undefined,
+        content: quickRetroContent,
+      });
+      setQuickRetroProjectId("");
+      setQuickRetroContent("");
+      setOpenQuickRetro(false);
+      showToast("회고가 작성되었습니다.");
+      void loadDashboard();
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err) || "회고 생성 실패");
+    }
+  };
+
+  const bulkUpdateOverdue = async () => {
+    if (overdueSelectedIds.length === 0) {
+      showToast("선택된 태스크가 없습니다.");
+      return;
+    }
+    try {
+      await Promise.all(
+        overdueSelectedIds.map(id =>
+          api.put(`/api/tasks/${id}`, { status: overdueStatus })
+        )
+      );
+      showToast("선택된 태스크 상태가 변경되었습니다.");
+      setOverdueSelectedIds([]);
+      void loadDashboard();
+    } catch (err: unknown) {
+      showToast(getErrorMessage(err) || "일괄 변경 실패");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 relative overflow-hidden">
@@ -348,7 +531,11 @@ export function Dashboard() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
-          {stats.map((stat, index) => (
+          {stats.map((stat, index) => {
+            const isProjects = stat.label === "진행 중인 프로젝트";
+            const isCompleted = stat.label === "완료된 태스크";
+            const isUpcoming = stat.label === "다가오는 마감일";
+            return (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, scale: 0.9 }}
@@ -356,7 +543,18 @@ export function Dashboard() {
               transition={{ duration: 0.3, delay: index * 0.1 }}
               whileHover={{ scale: 1.05, y: -5 }}
             >
-              <Card className="relative overflow-hidden group hover:shadow-2xl transition-all duration-300 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50">
+              <Card
+                className={`relative overflow-hidden group hover:shadow-2xl transition-all duration-300 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 ${
+                  isProjects || isCompleted || isUpcoming
+                    ? "cursor-pointer"
+                    : ""
+                }`}
+                onClick={() => {
+                  if (isProjects) scrollToProjects();
+                  if (isCompleted) setOpenCompletedTasks(true);
+                  if (isUpcoming) setOpenUpcoming(true);
+                }}
+              >
                 <div
                   className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-full blur-2xl group-hover:opacity-20 transition-opacity"
                   style={{
@@ -383,12 +581,12 @@ export function Dashboard() {
                 </div>
               </Card>
             </motion.div>
-          ))}
+          )})}
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Projects Overview */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6" ref={projectsRef}>
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 진행 중인 프로젝트
@@ -432,7 +630,11 @@ export function Dashboard() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   whileHover={{ scale: 1.02, x: 5 }}
                 >
-                  <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300">
+                  <Card
+                    className={`p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300 ${
+                      highlightProjects ? "ring-2 ring-indigo-400/60" : ""
+                    }`}
+                  >
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
@@ -472,11 +674,11 @@ export function Dashboard() {
                       <Progress value={project.progress} className="h-2" />
                     </div>
 
-                    <div className="flex gap-2 mt-4">
-                      <Button
+                  <div className="flex gap-2 mt-4">
+                  <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate("/tasks")}
+                        onClick={() => navigate(`/tasks?projectId=${project.id}`)}
                         className="flex-1 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border-gray-200 dark:border-slate-600"
                       >
                         태스크 보기
@@ -484,16 +686,18 @@ export function Dashboard() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate("/retrospective")}
+                        onClick={() =>
+                          navigate(`/retrospective?projectId=${project.id}`)
+                        }
                         className="flex-1 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm border-gray-200 dark:border-slate-600"
                       >
                         회고 작성
                       </Button>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
           </div>
 
           {/* Recent Activity & Quick Actions */}
@@ -510,7 +714,7 @@ export function Dashboard() {
                 </h3>
                 <div className="space-y-3">
                   <Button
-                    onClick={() => navigate("/schedule")}
+                    onClick={() => setOpenQuickSchedule(true)}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#4F46E5]/5 hover:border-[#4F46E5]/20"
                   >
@@ -518,7 +722,7 @@ export function Dashboard() {
                     일정 추가
                   </Button>
                   <Button
-                    onClick={() => navigate("/tasks")}
+                    onClick={() => setOpenQuickTask(true)}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#10B981]/5 hover:border-[#10B981]/20"
                   >
@@ -526,7 +730,7 @@ export function Dashboard() {
                     태스크 생성
                   </Button>
                   <Button
-                    onClick={() => navigate("/retrospective")}
+                    onClick={() => setOpenQuickRetro(true)}
                     variant="outline"
                     className="w-full justify-start hover:bg-[#F59E0B]/5 hover:border-[#F59E0B]/20"
                   >
@@ -613,7 +817,7 @@ export function Dashboard() {
                       확인할 수 있습니다.
                     </p>
                     <Button
-                      onClick={() => navigate("/schedule")}
+                      onClick={() => setOpenUpcoming(true)}
                       size="sm"
                       className="bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl transition-all"
                     >
@@ -623,9 +827,702 @@ export function Dashboard() {
                 </div>
               </Card>
             </motion.div>
+
+            {/* Overdue Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              <Card className="p-6 bg-white/60 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-2xl shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      마감 초과 태스크
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">
+                      {rawTasks.filter(t => {
+                        if (!t.dueDate) return false;
+                        const d = new Date(t.dueDate);
+                        return d < new Date() && t.status !== "done";
+                      }).length}
+                    </div>
+                  </div>
+                  <Button onClick={() => setOpenOverdueTasks(true)}>
+                    확인
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </div>
+
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60]">
+          <div className="rounded-full bg-slate-900 text-white px-4 py-2 text-sm shadow-lg">
+            {toast.message}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming Deadlines Dialog */}
+      <Dialog open={openUpcoming} onOpenChange={setOpenUpcoming}>
+        <DialogContent
+          className="sm:max-w-3xl"
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              setOpenUpcoming(false);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>다가오는 마감일</DialogTitle>
+          </DialogHeader>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-4 bg-white/70 dark:bg-slate-900/60">
+                <div className="text-xs text-slate-500">태스크</div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-white">
+                  {
+                    getUpcomingCounts(rawTasks, rawSchedules)
+                      .upcomingTaskDeadlines
+                  }
+                </div>
+              </Card>
+              <Card className="p-4 bg-white/70 dark:bg-slate-900/60">
+                <div className="text-xs text-slate-500">일정</div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-white">
+                  {
+                    getUpcomingCounts(rawTasks, rawSchedules)
+                      .upcomingScheduleDeadlines
+                  }
+                </div>
+              </Card>
+            </div>
+
+            <div>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                7일 이내 태스크
+              </div>
+              <div className="space-y-2">
+                {rawTasks
+                  .filter(t => {
+                    if (!t.dueDate) return false;
+                    const d = new Date(t.dueDate);
+                    const now = new Date();
+                    const in7 = new Date();
+                    in7.setDate(now.getDate() + 7);
+                    return d >= now && d <= in7;
+                  })
+                  .map(t => (
+                    <div
+                      key={t._id}
+                      className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
+                    >
+                      <div>
+                        <div className="font-medium text-slate-800 dark:text-white">
+                          {t.title}
+                        </div>
+                        {t.dueDate && (
+                          <div className="text-xs text-slate-500">
+                            {new Date(t.dueDate).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      navigate(
+                        `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
+                      )
+                    }
+                  >
+                    보기
+                  </Button>
+                    </div>
+                  ))}
+                {rawTasks.filter(t => {
+                  if (!t.dueDate) return false;
+                  const d = new Date(t.dueDate);
+                  const now = new Date();
+                  const in7 = new Date();
+                  in7.setDate(now.getDate() + 7);
+                  return d >= now && d <= in7;
+                }).length === 0 && (
+                  <div className="text-sm text-slate-500">
+                    해당 태스크가 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                7일 이내 일정
+              </div>
+              <div className="space-y-2">
+                {rawSchedules
+                  .filter(s => {
+                    if (!s.date) return false;
+                    const d = new Date(s.date);
+                    const now = new Date();
+                    const in7 = new Date();
+                    in7.setDate(now.getDate() + 7);
+                    return d >= now && d <= in7;
+                  })
+                  .map(s => (
+                    <div
+                      key={s._id}
+                      className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
+                    >
+                      <div>
+                        <div className="font-medium text-slate-800 dark:text-white">
+                          {s.title}
+                        </div>
+                        {s.date && (
+                          <div className="text-xs text-slate-500">
+                            {new Date(s.date).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      <Button size="sm" onClick={() => navigate("/schedule")}>
+                        보기
+                      </Button>
+                    </div>
+                  ))}
+                {rawSchedules.filter(s => {
+                  if (!s.date) return false;
+                  const d = new Date(s.date);
+                  const now = new Date();
+                  const in7 = new Date();
+                  in7.setDate(now.getDate() + 7);
+                  return d >= now && d <= in7;
+                }).length === 0 && (
+                  <div className="text-sm text-slate-500">
+                    해당 일정이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 닫기
+            </div>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Completed Tasks Dialog */}
+      <Dialog open={openCompletedTasks} onOpenChange={setOpenCompletedTasks}>
+        <DialogContent
+          className="sm:max-w-2xl"
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              setOpenCompletedTasks(false);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>완료된 태스크</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {rawTasks
+              .filter(t => t.status === "done")
+              .map(t => (
+                <div
+                  key={t._id}
+                  className="flex items-center justify-between rounded-lg border border-slate-200/70 dark:border-slate-700/70 p-3"
+                >
+                  <div>
+                    <div className="font-medium text-slate-800 dark:text-white">
+                      {t.title}
+                    </div>
+                    {t.updatedAt && (
+                      <div className="text-xs text-slate-500">
+                        완료: {new Date(t.updatedAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      navigate(
+                        `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
+                      )
+                    }
+                  >
+                    보기
+                  </Button>
+                </div>
+              ))}
+            {rawTasks.filter(t => t.status === "done").length === 0 && (
+              <div className="text-sm text-slate-500">
+                완료된 태스크가 없습니다.
+              </div>
+            )}
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 닫기
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Overdue Tasks Dialog */}
+      <Dialog open={openOverdueTasks} onOpenChange={setOpenOverdueTasks}>
+        <DialogContent
+          className="sm:max-w-2xl"
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void bulkUpdateOverdue();
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>마감 초과 태스크</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                선택한 태스크 상태 변경
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={overdueStatus}
+                  onValueChange={value =>
+                    setOverdueStatus(value as "todo" | "doing" | "done")
+                  }
+                >
+                  <SelectTrigger className="h-9 w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">할 일</SelectItem>
+                    <SelectItem value="doing">진행 중</SelectItem>
+                    <SelectItem value="done">완료</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={bulkUpdateOverdue}>적용</Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="태스크 검색"
+                value={overdueQuery}
+                onChange={e => setOverdueQuery(e.target.value)}
+              />
+              <Select
+                value={overdueProjectId}
+                onValueChange={setOverdueProjectId}
+              >
+                <SelectTrigger className="h-9 w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 프로젝트</SelectItem>
+                  {rawProjects.map(p => (
+                    <SelectItem key={p._id} value={p._id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={overdueFilter}
+                onValueChange={value =>
+                  setOverdueFilter(value as "all" | "todo" | "doing")
+                }
+              >
+                <SelectTrigger className="h-9 w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="todo">할 일</SelectItem>
+                  <SelectItem value="doing">진행 중</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <div>
+                선택됨 {overdueSelectedIds.length}개
+              </div>
+              <button
+                className="underline"
+                onClick={() => {
+                  const overdueIds = rawTasks
+                    .filter(t => {
+                      if (!t.dueDate) return false;
+                      const d = new Date(t.dueDate);
+                      const projectOk =
+                        overdueProjectId === "all" ||
+                        t.projectId === overdueProjectId;
+                      const statusOk =
+                        overdueFilter === "all"
+                          ? true
+                          : t.status === overdueFilter;
+                      const textOk =
+                        !overdueQuery ||
+                        t.title
+                          .toLowerCase()
+                          .includes(overdueQuery.toLowerCase());
+                      return (
+                        d < new Date() &&
+                        t.status !== "done" &&
+                        projectOk &&
+                        statusOk &&
+                        textOk
+                      );
+                    })
+                    .map(t => t._id);
+                  setOverdueSelectedIds(
+                    overdueSelectedIds.length === overdueIds.length
+                      ? []
+                      : overdueIds
+                  );
+                }}
+              >
+                전체 선택/해제
+              </button>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-4">
+              {Array.from(
+                rawTasks
+                  .filter(t => {
+                    if (!t.dueDate) return false;
+                    const d = new Date(t.dueDate);
+                    const projectOk =
+                      overdueProjectId === "all" ||
+                      t.projectId === overdueProjectId;
+                    const statusOk =
+                      overdueFilter === "all"
+                        ? true
+                        : t.status === overdueFilter;
+                    const textOk =
+                      !overdueQuery ||
+                      t.title
+                        .toLowerCase()
+                        .includes(overdueQuery.toLowerCase());
+                    return (
+                      d < new Date() &&
+                      t.status !== "done" &&
+                      projectOk &&
+                      statusOk &&
+                      textOk
+                    );
+                  })
+                  .reduce((acc, t) => {
+                    const key = t.projectId ?? "unassigned";
+                    if (!acc.has(key)) acc.set(key, []);
+                    acc.get(key)!.push(t);
+                    return acc;
+                  }, new Map<string, typeof rawTasks>())
+                  .entries()
+              ).map(([pid, list]) => (
+                <div key={pid} className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {pid === "unassigned"
+                        ? "프로젝트 미지정"
+                        : rawProjects.find(p => p._id === pid)?.title ||
+                          "알 수 없는 프로젝트"}
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {
+                        list.filter(t => overdueSelectedIds.includes(t._id))
+                          .length
+                      }
+                      /{list.length}
+                    </span>
+                    <button
+                      className="text-xs underline text-slate-500"
+                      onClick={() => {
+                        const ids = list.map(t => t._id);
+                        const allSelected = ids.every(id =>
+                          overdueSelectedIds.includes(id)
+                        );
+                        setOverdueSelectedIds(s =>
+                          allSelected
+                            ? s.filter(id => !ids.includes(id))
+                            : Array.from(new Set([...s, ...ids]))
+                        );
+                      }}
+                    >
+                      프로젝트 전체 선택/해제
+                    </button>
+                  </div>
+                  {list.map((t, idx) => (
+                    <motion.div
+                      key={t._id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.03 }}
+                      className="flex items-center justify-between rounded-lg border border-red-200/70 dark:border-red-800/50 p-3"
+                    >
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={overdueSelectedIds.includes(t._id)}
+                          onChange={e => {
+                            setOverdueSelectedIds(s =>
+                              e.target.checked
+                                ? [...s, t._id]
+                                : s.filter(id => id !== t._id)
+                            );
+                          }}
+                        />
+                        <div>
+                          <div className="font-medium text-slate-800 dark:text-white">
+                            {t.title}
+                          </div>
+                          {t.dueDate && (
+                            <div className="text-xs text-red-500">
+                              {new Date(t.dueDate).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/tasks?projectId=${t.projectId ?? ""}&highlight=${t._id}`
+                          )
+                        }
+                      >
+                        보기
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+              ))}
+              {rawTasks.filter(t => {
+                if (!t.dueDate) return false;
+                const d = new Date(t.dueDate);
+                const projectOk =
+                  overdueProjectId === "all" ||
+                  t.projectId === overdueProjectId;
+                const statusOk =
+                  overdueFilter === "all"
+                    ? true
+                    : t.status === overdueFilter;
+                const textOk =
+                  !overdueQuery ||
+                  t.title.toLowerCase().includes(overdueQuery.toLowerCase());
+                return (
+                  d < new Date() &&
+                  t.status !== "done" &&
+                  projectOk &&
+                  statusOk &&
+                  textOk
+                );
+              }).length === 0 && (
+                <div className="text-sm text-slate-500">
+                  마감 초과 태스크가 없습니다.
+                </div>
+              )}
+            </div>
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 적용
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Task Dialog */}
+      <Dialog open={openQuickTask} onOpenChange={setOpenQuickTask}>
+        <DialogContent
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void createQuickTask(e as any);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>빠른 태스크 생성</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createQuickTask} className="space-y-4">
+            <div>
+              <div className="text-xs text-slate-500 mb-1">프로젝트</div>
+              <Select
+                value={quickTaskProjectId}
+                onValueChange={setQuickTaskProjectId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="프로젝트 선택" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  {rawProjects.map(p => (
+                    <SelectItem key={p._id} value={p._id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Input
+              placeholder="태스크 제목"
+              value={quickTaskTitle}
+              onChange={e => setQuickTaskTitle(e.target.value)}
+              className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+            />
+            <div>
+              <div className="text-xs text-slate-500 mb-1">마감일</div>
+              <Input
+                type="date"
+                value={quickTaskDueDate}
+                onChange={e => setQuickTaskDueDate(e.target.value)}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 mb-1">메모</div>
+              <Textarea
+                rows={3}
+                placeholder="메모를 입력하세요"
+                value={quickTaskMemo}
+                onChange={e => setQuickTaskMemo(e.target.value)}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              />
+            </div>
+            <Select
+              value={quickTaskStatus}
+              onValueChange={(value: "todo" | "doing" | "done") =>
+                setQuickTaskStatus(value)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="상태 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todo">할 일</SelectItem>
+                <SelectItem value="doing">진행 중</SelectItem>
+                <SelectItem value="done">완료</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit">생성</Button>
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 생성
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Schedule Dialog */}
+      <Dialog open={openQuickSchedule} onOpenChange={setOpenQuickSchedule}>
+        <DialogContent
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void createQuickSchedule(e as any);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>빠른 일정 추가</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createQuickSchedule} className="space-y-4">
+            <Input
+              placeholder="일정 제목"
+              value={quickScheduleTitle}
+              onChange={e => setQuickScheduleTitle(e.target.value)}
+              className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+            />
+            <div>
+              <div className="text-xs text-slate-500 mb-1">날짜</div>
+              <Input
+                type="date"
+                value={quickScheduleDate}
+                onChange={e => setQuickScheduleDate(e.target.value)}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              />
+            </div>
+            <Select
+              value={quickScheduleCategory}
+              onValueChange={setQuickScheduleCategory}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="카테고리 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="회의">회의</SelectItem>
+                <SelectItem value="개발">개발</SelectItem>
+                <SelectItem value="개인">개인</SelectItem>
+              </SelectContent>
+            </Select>
+            <div>
+              <div className="text-xs text-slate-500 mb-1">메모</div>
+              <Textarea
+                rows={3}
+                placeholder="메모를 입력하세요"
+                value={quickScheduleMemo}
+                onChange={e => setQuickScheduleMemo(e.target.value)}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              />
+            </div>
+            <Button type="submit">추가</Button>
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 추가
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Retro Dialog */}
+      <Dialog open={openQuickRetro} onOpenChange={setOpenQuickRetro}>
+        <DialogContent
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void createQuickRetro(e as any);
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>빠른 회고 작성</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createQuickRetro} className="space-y-4">
+            <div>
+              <div className="text-xs text-slate-500 mb-1">프로젝트 (선택)</div>
+              <Select
+                value={quickRetroProjectId}
+                onValueChange={setQuickRetroProjectId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="프로젝트 선택" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  {rawProjects.map(p => (
+                    <SelectItem key={p._id} value={p._id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              rows={5}
+              placeholder="회고 내용을 입력하세요"
+              value={quickRetroContent}
+              onChange={e => setQuickRetroContent(e.target.value)}
+              className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+            />
+            <Button type="submit">작성</Button>
+            <div className="text-xs text-slate-500">
+              단축키: ⌘/Ctrl+Enter 작성
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
