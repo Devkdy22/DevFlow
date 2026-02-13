@@ -32,6 +32,8 @@ export interface Schedule {
   userId: string;
   title: string;
   date: Date;
+  startDate?: Date;
+  endDate?: Date;
   category: string;
   memo?: string;
   createdAt?: Date;
