@@ -91,14 +91,6 @@ export function Retrospective() {
     }
   }, [projects, searchParams]);
 
-  const projectNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    projects.forEach(p => {
-      map.set(p._id, p.title);
-    });
-    return map;
-  }, [projects]);
-
   const retrosByProject = useMemo(() => {
     const map = new Map<string, Retro[]>();
     items.forEach(r => {
