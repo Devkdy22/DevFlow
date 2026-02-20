@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { useRef } from "react";
 import {
   Code2,
   Zap,
@@ -15,12 +16,16 @@ import {
 import { AnimatedBackground } from "./../components/AnimatedBackground";
 import { CodeRain } from "./../components/CodeRain";
 import { Button } from "../components/ui/button";
+import { useGsapFloat } from "@devflow/motion";
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
+  const heroLogoRef = useRef<HTMLDivElement>(null);
+  useGsapFloat(heroLogoRef, { amplitude: 10, duration: 3.2, autoLoadScript: true });
+
   return (
     <div className="min-h-screen  w-full  relative overflow-hidden bg-[#0a0b14]">
       {/* Grid Pattern Background */}
@@ -95,7 +100,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               transition={{ duration: 0.5 }}
               className="flex justify-center mb-8"
             >
-              <div className="relative group">
+              <div className="relative group" ref={heroLogoRef}>
                 <div className="absolute inset-0 bg-gradient-to-r from-[#4F46E5] to-[#10B981] rounded-3xl blur-2xl opacity-50 group-hover:opacity-75 transition-opacity" />
                 <div className="relative bg-gradient-to-br from-[#4F46E5] to-[#4338CA] p-6 rounded-3xl shadow-2xl">
                   <Code2 className="h-16 w-16 text-white" />
