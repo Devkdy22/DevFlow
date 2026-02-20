@@ -7,6 +7,13 @@
     "module": "ESNext",
     "types": ["vite/client"],
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@devflow/core": ["../packages/core/dist/index.d.ts"],
+      "@devflow/navigation": ["../packages/navigation/dist/index.d.ts"],
+      "@devflow/motion": ["../packages/motion/dist/index.d.ts"],
+      "@devflow/shell": ["../packages/shell/dist/index.d.ts"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",
