@@ -5,22 +5,22 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import axios from "axios";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { ThemeToggle } from "./components/ThemeToggle";
-import {
-  Code2,
-  LayoutDashboard,
-  FolderKanban,
-  Calendar,
-  FileText,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react";
+import { Code2 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { sendResetPasswordMail, handleGitHubCallback } from "./services/auth";
+import { AppShell } from "@devflow/shell";
+import { APP_NAVIGATION } from "@devflow/navigation";
+import { PageTransition } from "@devflow/motion";
+import {
+  applyAuthHeader,
+  clearAuthToken,
+  persistAuthToken,
+  readAuthToken,
+} from "@devflow/core";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 const LandingPage = lazy(() =>
   import("./pages/LandingPage").then(m => ({ default: m.LandingPage })),
@@ -64,8 +64,6 @@ const CodeRain = lazy(() =>
   import("./components/CodeRain").then(m => ({ default: m.CodeRain })),
 );
 
-const AUTH_TOKEN_KEY = "accessToken";
-
 function RouteLoadingFallback() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
@@ -75,13 +73,11 @@ function RouteLoadingFallback() {
 }
 
 // Axios Authorization 헤더 설정
-axios.defaults.headers.common["Authorization"] = `Bearer ${localStorage.getItem(
-  AUTH_TOKEN_KEY
-)}`;
+applyAuthHeader(axios.defaults.headers.common, readAuthToken(localStorage));
 
 // ✅ 보호된 라우트 컴포넌트
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = readAuthToken(localStorage);
 
   if (!token) {
     return <Navigate to="/auth" replace />;
@@ -92,147 +88,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // ✅ 인증 페이지 래퍼 (이미 로그인된 경우 대시보드로)
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = readAuthToken(localStorage);
 
   if (token) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
-}
-
-// ✅ 레이아웃 컴포넌트 (네비게이션 바 포함)
-function AppLayout({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleLogout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    navigate("/");
-  };
-
-  const navigationItems = [
-    { icon: LayoutDashboard, label: "대시보드", path: "/dashboard" },
-    { icon: FolderKanban, label: "태스크 보드", path: "/tasks" },
-    { icon: Calendar, label: "일정 관리", path: "/schedule" },
-    { icon: FileText, label: "프로젝트 회고", path: "/retrospective" },
-  ];
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      {/* Top Navigation */}
-      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div
-              className="flex items-center gap-3 cursor-pointer"
-              onClick={() => navigate("/dashboard")}
-            >
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#4F46E5] to-[#10B981] rounded-xl blur-md opacity-50" />
-                <div className="relative bg-gradient-to-br from-[#4F46E5] to-[#4338CA] p-2 rounded-xl">
-                  <Code2 className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              <span className="bg-gradient-to-r from-[#4F46E5] to-[#10B981] bg-clip-text text-transparent font-bold text-xl">
-                DevFlow
-              </span>
-            </div>
-
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-2">
-              {navigationItems.map(item => (
-                <button
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200
-                    ${
-                      location.pathname === item.path
-                        ? "bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white shadow-lg"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    }
-                  `}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-3">
-              <ThemeToggle />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="hidden md:flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>로그아웃</span>
-              </Button>
-
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-                ) : (
-                  <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          {isMobileMenuOpen && (
-            <div className="md:hidden py-4 border-t border-gray-200 dark:border-slate-700 animate-in slide-in-from-top-2 duration-200">
-              <div className="space-y-2">
-                {navigationItems.map(item => (
-                  <button
-                    key={item.path}
-                    onClick={() => {
-                      navigate(item.path);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                      ${
-                        location.pathname === item.path
-                          ? "bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white shadow-lg"
-                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                      }
-                    `}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span>로그아웃</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      {/* Page Content */}
-      <main>{children}</main>
-    </div>
-  );
 }
 
 // ✅ 인증 페이지 컴포넌트
@@ -248,6 +110,22 @@ function AuthPage() {
     | "github-signup"
   >(null);
   const [resetToken, setResetToken] = useState<string>("");
+
+  const handleGitHubAuthCallback = useCallback(
+    async (code: string, state: string) => {
+      try {
+        const { token, user } = await handleGitHubCallback(code, state);
+        persistAuthToken(localStorage, token);
+        applyAuthHeader(axios.defaults.headers.common, token);
+        navigate("/dashboard");
+        alert(`환영합니다, ${user.name}님!`);
+      } catch (error) {
+        console.error("GitHub 인증 실패:", error);
+        alert("GitHub 인증에 실패했습니다.");
+      }
+    },
+    [navigate]
+  );
 
   // URL 파라미터 처리
   useEffect(() => {
@@ -267,8 +145,8 @@ function AuthPage() {
 
     // GitHub 로그인 완료 (JWT 토큰 방식)
     if (githubToken) {
-      localStorage.setItem(AUTH_TOKEN_KEY, githubToken);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${githubToken}`;
+      persistAuthToken(localStorage, githubToken);
+      applyAuthHeader(axios.defaults.headers.common, githubToken);
       navigate("/dashboard");
       return;
     }
@@ -278,7 +156,7 @@ function AuthPage() {
       handleGitHubAuthCallback(ghCode, ghState);
       return;
     }
-  }, [location.search, navigate]);
+  }, [location.search, navigate, handleGitHubAuthCallback]);
 
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -287,8 +165,8 @@ function AuthPage() {
 
       if (!token) throw new Error("로그인 실패");
 
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      persistAuthToken(localStorage, token);
+      applyAuthHeader(axios.defaults.headers.common, token);
       navigate("/dashboard");
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -343,19 +221,6 @@ function AuthPage() {
     alert("비밀번호가 성공적으로 변경되었습니다. 로그인해주세요.");
     setAuthMode(null);
     setActiveTab("login");
-  };
-
-  const handleGitHubAuthCallback = async (code: string, state: string) => {
-    try {
-      const { token, user } = await handleGitHubCallback(code, state);
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      navigate("/dashboard");
-      alert(`환영합니다, ${user.name}님!`);
-    } catch (error) {
-      console.error("GitHub 인증 실패:", error);
-      alert("GitHub 인증에 실패했습니다.");
-    }
   };
 
   return (
@@ -574,16 +439,33 @@ function AuthPage() {
   );
 }
 
+const PROTECTED_ROUTES: Array<{
+  path: string;
+  Component: React.ComponentType;
+}> = [
+  { path: "/dashboard", Component: Dashboard },
+  { path: "/projects", Component: ProjectForm },
+  { path: "/projects/:id", Component: ProjectForm },
+  { path: "/tasks", Component: TaskBoard },
+  { path: "/schedule", Component: Schedule },
+  { path: "/retrospective", Component: Retrospective },
+];
+
 // ✅ 메인 App 컴포넌트
 function AppContent() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
+  const handleLogout = () => {
+    clearAuthToken(localStorage);
+    applyAuthHeader(axios.defaults.headers.common, null);
+    navigate("/");
+  };
 
   useEffect(() => {
     // 인증 상태 확인
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = readAuthToken(localStorage);
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      applyAuthHeader(axios.defaults.headers.common, token);
     }
     setAuthChecked(true);
   }, []);
@@ -616,66 +498,25 @@ function AppContent() {
         />
 
         {/* Protected Routes with Layout */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Dashboard />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <ProjectForm />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects/:id"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <ProjectForm />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tasks"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <TaskBoard />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/schedule"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Schedule />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/retrospective"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Retrospective />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
+        {PROTECTED_ROUTES.map(({ path, Component }) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <ProtectedRoute>
+                <AppShell
+                  onLogout={handleLogout}
+                  navigationItems={APP_NAVIGATION}
+                  rightSlot={<ThemeToggle />}
+                >
+                  <PageTransition>
+                    <Component />
+                  </PageTransition>
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
+        ))}
 
         {/* Catch all - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
