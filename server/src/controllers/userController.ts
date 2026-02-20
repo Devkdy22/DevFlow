@@ -1,11 +1,11 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import User from "../models/User";
-import { AuthRequest } from "../middleware/authMiddleware";
 
 // 내 정보 조회
-export const getMe = async (req: AuthRequest, res: Response) => {
+export const getMe = async (req: Request, res: Response) => {
   try {
+    if (!req.user) return res.status(401).json({ message: "인증이 필요합니다." });
     const user = await User.findById(req.user.id).select("-password");
     if (!user)
       return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
@@ -16,8 +16,9 @@ export const getMe = async (req: AuthRequest, res: Response) => {
 };
 
 // 이름 변경
-export const updateName = async (req: AuthRequest, res: Response) => {
+export const updateName = async (req: Request, res: Response) => {
   try {
+    if (!req.user) return res.status(401).json({ message: "인증이 필요합니다." });
     const { name } = req.body;
     const updated = await User.findByIdAndUpdate(
       req.user.id,
@@ -31,8 +32,9 @@ export const updateName = async (req: AuthRequest, res: Response) => {
 };
 
 // 비밀번호 변경
-export const updatePassword = async (req: AuthRequest, res: Response) => {
+export const updatePassword = async (req: Request, res: Response) => {
   try {
+    if (!req.user) return res.status(401).json({ message: "인증이 필요합니다." });
     const { password } = req.body;
     const hashed = await bcrypt.hash(password, 10);
     await User.findByIdAndUpdate(req.user.id, { password: hashed });
@@ -43,8 +45,9 @@ export const updatePassword = async (req: AuthRequest, res: Response) => {
 };
 
 // 회원 탈퇴
-export const deleteMe = async (req: AuthRequest, res: Response) => {
+export const deleteMe = async (req: Request, res: Response) => {
   try {
+    if (!req.user) return res.status(401).json({ message: "인증이 필요합니다." });
     await User.findByIdAndDelete(req.user.id);
     res.json({ message: "회원 탈퇴 완료" });
   } catch (error) {

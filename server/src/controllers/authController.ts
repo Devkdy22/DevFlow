@@ -66,6 +66,11 @@ export const loginUser = async (req: Request, res: Response) => {
     const user = await User.findOne({ email });
     if (!user)
       return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
+    if (!user.password) {
+      return res
+        .status(400)
+        .json({ message: "비밀번호 로그인을 사용할 수 없는 계정입니다." });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)

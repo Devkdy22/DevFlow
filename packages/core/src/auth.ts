@@ -14,6 +14,22 @@ type JwtPayload = {
   exp?: number;
 };
 
+function decodeBase64(base64: string): string | null {
+  const atobFn = (globalThis as { atob?: (data: string) => string }).atob;
+  if (typeof atobFn === "function") {
+    return atobFn(base64);
+  }
+
+  const bufferApi = (globalThis as {
+    Buffer?: { from: (input: string, encoding: string) => { toString: (encoding?: string) => string } };
+  }).Buffer;
+  if (bufferApi?.from) {
+    return bufferApi.from(base64, "base64").toString("utf-8");
+  }
+
+  return null;
+}
+
 function decodeJwtPayload(token: string): JwtPayload | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
@@ -21,8 +37,8 @@ function decodeJwtPayload(token: string): JwtPayload | null {
   try {
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-    if (typeof atob !== "function") return null;
-    const raw = atob(padded);
+    const raw = decodeBase64(padded);
+    if (!raw) return null;
     return JSON.parse(raw) as JwtPayload;
   } catch {
     return null;
