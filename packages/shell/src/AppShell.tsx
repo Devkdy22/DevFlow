@@ -30,8 +30,8 @@ export function AppShell({
   useGsapFloat(logoRef, { amplitude: 5, duration: 2.8, autoLoadScript: true });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 shadow-sm">
+    <div className="min-h-screen bg-background text-foreground">
+      <nav className="bg-background/90 backdrop-blur-xl border-b border-border sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div
@@ -62,7 +62,7 @@ export function AppShell({
                     ${
                       location.pathname === item.path
                         ? "bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white shadow-lg"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                        : "text-foreground/80 hover:bg-accent"
                     }
                   `}
                 >
@@ -76,19 +76,19 @@ export function AppShell({
               {rightSlot}
               <button
                 onClick={onLogout}
-                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800"
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-foreground/85 hover:text-foreground hover:bg-accent"
               >
                 <LogOut className="h-4 w-4" />
                 <span>로그아웃</span>
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen((open: boolean) => !open)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+                className="md:hidden p-2 rounded-lg hover:bg-accent"
               >
                 {isMobileMenuOpen ? (
-                  <X className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+                  <X className="h-6 w-6 text-foreground/85" />
                 ) : (
-                  <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+                  <Menu className="h-6 w-6 text-foreground/85" />
                 )}
               </button>
             </div>
@@ -104,7 +104,7 @@ export function AppShell({
                 transition={{ duration: 0.2 }}
                 className="md:hidden overflow-hidden"
               >
-                <div className="py-4 border-t border-gray-200 dark:border-slate-700">
+                <div className="py-4 border-t border-border">
                   <div className="space-y-2">
                     {navigationItems.map(item => (
                       <button
@@ -118,7 +118,7 @@ export function AppShell({
                           ${
                             location.pathname === item.path
                               ? "bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white shadow-lg"
-                              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                              : "text-foreground/80 hover:bg-accent"
                           }
                         `}
                       >
@@ -128,7 +128,7 @@ export function AppShell({
                     ))}
                     <button
                       onClick={onLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-foreground/85 hover:bg-accent"
                     >
                       <LogOut className="h-5 w-5" />
                       <span>로그아웃</span>
