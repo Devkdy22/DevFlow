@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest --runInBand",
+    "test:libs": "jest -c jest.libs.config.ts --runInBand",
     "test:watch": "jest --watch",
     "migrate:task-status": "tsx src/scripts/migrateTaskStatus.ts",
     "migrate:schedule-categories": "tsx src/scripts/migrateScheduleCategories.ts"
