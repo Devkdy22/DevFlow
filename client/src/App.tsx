@@ -18,7 +18,7 @@ import {
   applyAuthHeader,
   clearAuthToken,
   persistAuthToken,
-  readAuthToken,
+  readValidAuthToken,
 } from "@devflow/core";
 import { ThemeToggle } from "./components/ThemeToggle";
 
@@ -73,11 +73,11 @@ function RouteLoadingFallback() {
 }
 
 // Axios Authorization 헤더 설정
-applyAuthHeader(axios.defaults.headers.common, readAuthToken(localStorage));
+applyAuthHeader(axios.defaults.headers.common, readValidAuthToken(localStorage));
 
 // ✅ 보호된 라우트 컴포넌트
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = readAuthToken(localStorage);
+  const token = readValidAuthToken(localStorage);
 
   if (!token) {
     return <Navigate to="/auth" replace />;
@@ -88,9 +88,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // ✅ 인증 페이지 래퍼 (이미 로그인된 경우 대시보드로)
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const token = readAuthToken(localStorage);
+  const location = useLocation();
+  const token = readValidAuthToken(localStorage);
+  const forceAuthPage = new URLSearchParams(location.search).get("force") === "1";
 
-  if (token) {
+  if (token && !forceAuthPage) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -358,14 +360,10 @@ function AuthPage() {
               <div className="p-8 lg:p-10">
                 <div className="mb-8">
                   <h2 className="text-gray-900 mb-2 font-bold text-xl">
-                    {activeTab === "login"
-                      ? "다시 오신 것을 환영합니다"
-                      : "새로운 여정을 시작하세요"}
+                    다시 오신 것을 환영합니다
                   </h2>
                   <p className="text-gray-600">
-                    {activeTab === "login"
-                      ? "계정에 로그인하여 프로젝트를 관리하세요"
-                      : "개발자를 위한 프로젝트 관리를 시작하세요"}
+                    계정에 로그인하거나 회원가입하여 프로젝트를 관리하세요
                   </p>
                 </div>
 
@@ -423,6 +421,7 @@ function AuthPage() {
                           <SignupForm
                             onSubmit={handleSignup}
                             onGitHubSignup={() => setAuthMode("github-signup")}
+                            onGoLogin={() => setActiveTab("login")}
                           />
                         </div>
                       )}
@@ -463,7 +462,7 @@ function AppContent() {
 
   useEffect(() => {
     // 인증 상태 확인
-    const token = readAuthToken(localStorage);
+    const token = readValidAuthToken(localStorage);
     if (token) {
       applyAuthHeader(axios.defaults.headers.common, token);
     }
@@ -484,7 +483,7 @@ function AppContent() {
         {/* Landing Page */}
         <Route
           path="/"
-          element={<LandingPage onGetStarted={() => navigate("/auth")} />}
+          element={<LandingPage onGetStarted={() => navigate("/auth?force=1")} />}
         />
 
         {/* Auth Page */}
