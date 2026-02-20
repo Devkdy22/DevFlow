@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.packages.base.json",
+  "compilerOptions": {
+    "lib": ["ES2020"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}
