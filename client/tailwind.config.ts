@@ -5,7 +5,11 @@ interface ExtendedConfig extends Config {
 }
 
 export default {
-  content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
+  content: [
+    "./index.html",
+    "./src/**/*.{ts,tsx,js,jsx}",
+    "../packages/**/*.{ts,tsx,js,jsx}"
+  ],
   safelist: [
     "text-4xl",
     "font-bold",
@@ -18,7 +22,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // DevFlow 브랜드 색상
         primary: "#4F46E5",
         "primary-foreground": "#ffffff",
 

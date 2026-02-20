@@ -7,22 +7,16 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@devflow/core": path.resolve(__dirname, "../packages/core/dist/index.js"),
-      "@devflow/navigation": path.resolve(
-        __dirname,
-        "../packages/navigation/dist/index.js"
-      ),
-      "@devflow/motion": path.resolve(
-        __dirname,
-        "../packages/motion/dist/index.js"
-      ),
-      "@devflow/shell": path.resolve(__dirname, "../packages/shell/dist/index.js"),
-      "lucide-react": path.resolve(__dirname, "./node_modules/lucide-react"),
-      "framer-motion": path.resolve(__dirname, "./node_modules/framer-motion"),
+      "@devflow/core": path.resolve(__dirname, "../packages/core/src"),
+      "@devflow/navigation": path.resolve(__dirname, "../packages/navigation/src"),
+      "@devflow/motion": path.resolve(__dirname, "../packages/motion/src"),
+      "@devflow/shell": path.resolve(__dirname, "../packages/shell/src"),
       react: path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
       "react-router-dom": path.resolve(__dirname, "./node_modules/react-router-dom"),
-    },
+      "framer-motion": path.resolve(__dirname, "./node_modules/framer-motion"),
+      "lucide-react": path.resolve(__dirname, "./node_modules/lucide-react")
+    }
   },
   server: {
     proxy: {
