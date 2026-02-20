@@ -18,31 +18,15 @@
 
 ```bash
 DevFlow/
-├── client/                 # 프론트엔드 (React + TypeScript + Vite)
-│   ├── src/
-│   │   ├── components/    # 공용 컴포넌트
-│   │   ├── pages/         # 페이지 단위 컴포넌트
-│   │   ├── hooks/         # 커스텀 훅
-│   │   ├── api/           # API 연동 로직 (axios)
-│   │   ├── types/         # 전역 타입 정의
-│   │   └── main.tsx       # 진입 파일
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── server/                 # 백엔드 (Express + TypeScript + MongoDB)
-│   ├── src/
-│   │   ├── index.ts       # 서버 엔트리 포인트
-│   │   ├── config/        # DB 및 환경 설정
-│   │   ├── models/        # Mongoose 모델 정의
-│   │   ├── routes/        # Express 라우터
-│   │   ├── controllers/   # 요청 처리 로직
-│   │   └── utils/         # 유틸리티 함수
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── .env.example            # 환경변수 예시
-├── .gitignore              # Git에 포함하지 않을 파일
-└── README.md               # 프로젝트 개요
+├── client/                  # 프론트엔드 앱 (React + Vite)
+├── server/                  # 백엔드 API (Express + MongoDB)
+├── packages/                # 내부 라이브러리(workspaces)
+│   ├── core/               # auth/token/header 유틸
+│   ├── navigation/         # 네비게이션 데이터/아이콘 매핑
+│   ├── motion/             # 전환/애니메이션 유틸
+│   └── shell/              # 공통 AppShell 레이아웃
+├── docs/                    # 아키텍처/전략 문서
+└── README.md
 ```
 
 ---
@@ -56,11 +40,22 @@ git clone https://github.com/your-username/DevFlow.git
 cd DevFlow
 ```
 
-### 2️⃣ 서버 의존성 설치 및 실행
+### 2️⃣ 의존성 설치
+
+```bash
+npm install
+```
+
+### 3️⃣ 개발 서버 실행 (워크스페이스 빌드 포함)
+
+```bash
+npm run dev
+```
+
+### 4️⃣ 개별 실행 (선택)
 
 ```bash
 cd server
-npm install
 npm run dev
 ```
 
@@ -73,35 +68,25 @@ MongoDB Connected ✅
 
 이 출력됩니다.
 
-### 3️⃣ 클라이언트 의존성 설치 및 실행
-
 ```bash
 cd ../client
-npm install
 npm run dev
 ```
 
 > 브라우저에서 [http://localhost:5173](http://localhost:5173) 으로 접속하여 확인할 수 있습니다.
 
----
+### 5️⃣ 빌드/테스트 명령
 
-## 🧠 Frontend Architecture
+```bash
+# 내부 라이브러리 빌드
+npm run build:libs
 
-DevFlow 프론트엔드는 **확장성과 재사용성**을 목표로 설계되었습니다.
+# 전체 빌드 (libs + client + server)
+npm run build:all
 
-- Layout / Navigation / Motion / Core 로직 분리
-- 설정 기반 네비게이션 & 라우팅
-- 내부 라이브러리(workspaces) 구조 채택
-- 애니메이션 정책 일관성 유지 (framer-motion + gsap)
-
-프론트엔드 주요 구조는 다음과 같습니다.
-
-client/
-packages/
-├─ core/ # 인증/토큰/헤더 유틸
-├─ navigation/ # 네비게이션 설정 데이터
-├─ motion/ # 페이지 & UI 애니메이션
-└─ shell/ # AppShell 레이아웃
+# 라이브러리 단위 테스트
+npm run test:libs
+```
 
 ---
 
@@ -114,6 +99,17 @@ packages/
 
 ---
 
+## 🧠 아키텍처 요약
+
+- 모노레포(workspaces) 기반으로 앱과 라이브러리를 분리
+- `client`는 `@devflow/*` 라이브러리를 소비
+- 공통 관심사(auth/navigation/motion/shell)를 페이지 코드에서 분리
+- 애니메이션은 `framer-motion` + GSAP fallback 전략으로 통일
+
+자세한 설계/규칙은 위 `docs/*` 문서를 기준으로 유지합니다.
+
+---
+
 ## 🛠️ 주요 기술 스택
 
 | 구분                  | 기술                         | 설명                                     |
@@ -123,14 +119,6 @@ packages/
 | **Database**          | MongoDB + Mongoose           | 스키마 기반 NoSQL 데이터 관리            |
 | **Dev Tools**         | ESLint, Prettier             | 코드 품질 관리                           |
 | **Deployment (계획)** | AWS, Docker                  | 클라우드 및 컨테이너 기반 배포           |
-
----
-
-### 🎞️ Animation Strategy
-
-- **framer-motion**: 페이지 전환 및 UI 상태 변화
-- **gsap**: 로고 및 강조 요소 애니메이션
-- 네트워크 제한 환경을 고려한 gsap CDN fallback 구조 적용
 
 ---
 
