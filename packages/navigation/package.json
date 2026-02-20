@@ -1,0 +1,28 @@
+{
+  "name": "@devflow/navigation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./base": {
+      "types": "./dist/base.d.ts",
+      "import": "./dist/base.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && ./../../client/node_modules/.bin/tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "lucide-react": "^0.554.0"
+  }
+}
