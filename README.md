@@ -85,6 +85,35 @@ npm run dev
 
 ---
 
+## 🧠 Frontend Architecture
+
+DevFlow 프론트엔드는 **확장성과 재사용성**을 목표로 설계되었습니다.
+
+- Layout / Navigation / Motion / Core 로직 분리
+- 설정 기반 네비게이션 & 라우팅
+- 내부 라이브러리(workspaces) 구조 채택
+- 애니메이션 정책 일관성 유지 (framer-motion + gsap)
+
+프론트엔드 주요 구조는 다음과 같습니다.
+
+client/
+packages/
+├─ core/ # 인증/토큰/헤더 유틸
+├─ navigation/ # 네비게이션 설정 데이터
+├─ motion/ # 페이지 & UI 애니메이션
+└─ shell/ # AppShell 레이아웃
+
+---
+
+## 📚 문서
+
+- [Architecture Overview](./docs/architecture.md)
+- [Frontend Libraries](./docs/frontend-libraries.md)
+- [Animation Strategy](./docs/animation.md)
+- [Testing Strategy](./docs/testing.md)
+
+---
+
 ## 🛠️ 주요 기술 스택
 
 | 구분                  | 기술                         | 설명                                     |
@@ -94,6 +123,14 @@ npm run dev
 | **Database**          | MongoDB + Mongoose           | 스키마 기반 NoSQL 데이터 관리            |
 | **Dev Tools**         | ESLint, Prettier             | 코드 품질 관리                           |
 | **Deployment (계획)** | AWS, Docker                  | 클라우드 및 컨테이너 기반 배포           |
+
+---
+
+### 🎞️ Animation Strategy
+
+- **framer-motion**: 페이지 전환 및 UI 상태 변화
+- **gsap**: 로고 및 강조 요소 애니메이션
+- 네트워크 제한 환경을 고려한 gsap CDN fallback 구조 적용
 
 ---
 
@@ -164,3 +201,4 @@ build/
 ---
 
 > 💡 **DevFlow**는 “개발자의 흐름을 기록하다”라는 의미로, 개인의 성장과정을 한눈에 볼 수 있도록 돕는 개발자 중심 프로젝트입니다.
+> This project focuses not only on feature implementation, but also on building a scalable and maintainable frontend architecture.
