@@ -12,12 +12,12 @@ export function ThemeToggle() {
     <button
       onClick={toggleTheme}
       title={`테마: ${modeLabel} (클릭 시 변경)`}
-      className="relative w-16 h-8 rounded-full bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 border border-slate-300 dark:border-slate-500 shadow-inner transition-all duration-300 hover:shadow-lg"
+      className="relative inline-flex h-12 w-[76px] items-center rounded-full border border-white/85 bg-white/70 px-1.5 text-foreground shadow-[0_14px_28px_rgba(15,23,42,0.14)] backdrop-blur-2xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-white active:translate-y-0 active:scale-[0.98] dark:border-white/35 dark:bg-white/14 dark:text-slate-100 dark:shadow-[0_14px_30px_rgba(2,6,23,0.34)] dark:hover:bg-white/22"
     >
       <motion.div
-        className="absolute top-0.5 left-0.5 w-7 h-7 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center"
+        className="absolute top-1 left-1 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] dark:bg-slate-900 md:h-10 md:w-10"
         animate={{
-          x: themeMode === "light" ? 0 : themeMode === "dark" ? 16 : 32,
+          x: themeMode === "light" ? 0 : themeMode === "dark" ? 18 : 30,
         }}
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
       >

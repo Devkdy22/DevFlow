@@ -5,13 +5,12 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import axios from "axios";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { Code2 } from "lucide-react";
+import { Code2, LogOut } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { sendResetPasswordMail, handleGitHubCallback } from "./services/auth";
-import { AppShell } from "@devflow/shell";
 import { APP_NAVIGATION } from "@devflow/navigation";
 import { PageTransition } from "@devflow/motion";
 import {
@@ -21,6 +20,7 @@ import {
   readValidAuthToken,
 } from "@devflow/core";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { useTheme } from "./hooks/useTheme";
 
 const LandingPage = lazy(() =>
   import("./pages/LandingPage").then(m => ({ default: m.LandingPage })),
@@ -450,6 +450,162 @@ const PROTECTED_ROUTES: Array<{
   { path: "/retrospective", Component: Retrospective },
 ];
 
+function StableShell({
+  children,
+  onLogout,
+}: {
+  children: React.ReactNode;
+  onLogout: () => void;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { theme } = useTheme();
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const hideTimerRef = useRef<number | null>(null);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const threshold = 8;
+    const topThreshold = 24;
+
+    const showTemporarily = () => {
+      setHeaderVisible(true);
+      clearHideTimer();
+      if (window.scrollY > topThreshold) {
+        hideTimerRef.current = window.setTimeout(() => {
+          setHeaderVisible(false);
+          hideTimerRef.current = null;
+        }, 3000);
+      }
+    };
+
+    const onScroll = () => {
+      const y = window.scrollY;
+
+      if (y <= topThreshold) {
+        clearHideTimer();
+        setHeaderVisible(true);
+      } else if (y > lastY + threshold) {
+        clearHideTimer();
+        setHeaderVisible(false);
+      } else if (y < lastY - threshold) {
+        showTemporarily();
+      }
+
+      lastY = y;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearHideTimer();
+    };
+  }, [clearHideTimer]);
+
+  useEffect(() => {
+    setHeaderVisible(true);
+    clearHideTimer();
+    if (window.scrollY > 24) {
+      hideTimerRef.current = window.setTimeout(() => {
+        setHeaderVisible(false);
+        hideTimerRef.current = null;
+      }, 3000);
+    }
+  }, [location.pathname, clearHideTimer]);
+
+  const isDark = theme === "dark";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 text-foreground dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <header
+        className={`fixed inset-x-0 top-0 z-[2147483000] px-3 pt-3 transition-all duration-300 md:px-5 md:pt-4 ${
+          headerVisible
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-[112%] opacity-0"
+        }`}
+      >
+        <div
+          className={`mx-auto w-full max-w-[1600px] rounded-[30px] px-4 py-3 backdrop-blur-3xl md:px-6 ${
+            isDark
+              ? "border border-white/28 bg-slate-900/46 shadow-[0_24px_48px_rgba(2,6,23,0.38)] ring-1 ring-white/10"
+              : "border border-white/80 bg-white/62 shadow-[0_18px_42px_rgba(15,23,42,0.14)] ring-1 ring-white/65"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              className="group inline-flex items-center gap-3"
+            >
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4F46E5] to-[#4338CA] text-white shadow-[0_10px_24px_rgba(79,70,229,0.36)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-105">
+                <Code2 className="h-6 w-6" />
+              </span>
+              <span className="bg-gradient-to-r from-[#4F46E5] via-[#7C3AED] to-[#10B981] bg-clip-text text-[30px] font-extrabold tracking-tight text-transparent md:text-[34px]">
+                DevFlow
+              </span>
+            </button>
+
+            <div className="flex items-center gap-2 md:gap-3">
+              <ThemeToggle />
+              <button
+                type="button"
+                onClick={onLogout}
+                className={`inline-flex h-12 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
+                  isDark
+                    ? "border border-white/35 bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] hover:bg-white/22"
+                    : "border border-white/85 bg-white/70 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] hover:bg-white"
+                }`}
+              >
+                <LogOut className="h-4 w-4" />
+                <span>로그아웃</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={`mt-3 flex flex-wrap items-center justify-center gap-2.5 pt-3 ${
+              isDark ? "border-t border-white/12" : "border-t border-slate-200"
+            }`}
+          >
+            {APP_NAVIGATION.map(item => {
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.path}
+                  type="button"
+                  onClick={() => navigate(item.path)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] md:text-[15px] ${
+                    isActive
+                      ? isDark
+                        ? "border-white/85 bg-white/94 text-slate-900 shadow-[0_10px_24px_rgba(255,255,255,0.26)]"
+                        : "border-white bg-white text-indigo-900 shadow-[0_10px_24px_rgba(79,70,229,0.16)]"
+                      : isDark
+                        ? "border-white/30 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] hover:bg-white/20"
+                        : "border-white/90 bg-white/72 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-white"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </header>
+
+      <main className="relative pt-[198px] md:pt-[216px]">{children}</main>
+    </div>
+  );
+}
+
 // ✅ 메인 App 컴포넌트
 function AppContent() {
   const navigate = useNavigate();
@@ -503,15 +659,11 @@ function AppContent() {
             path={path}
             element={
               <ProtectedRoute>
-                <AppShell
-                  onLogout={handleLogout}
-                  navigationItems={APP_NAVIGATION}
-                  rightSlot={<ThemeToggle />}
-                >
+                <StableShell onLogout={handleLogout}>
                   <PageTransition>
                     <Component />
                   </PageTransition>
-                </AppShell>
+                </StableShell>
               </ProtectedRoute>
             }
           />
