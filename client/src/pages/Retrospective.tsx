@@ -200,7 +200,9 @@ export function Retrospective() {
           <div>
             <div className="flex items-center gap-3 mb-2">
             <FileText className="h-8 w-8 text-[#4F46E5]" />
-            <h1 className="text-gray-900 dark:text-white">프로젝트 회고</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              프로젝트 회고
+            </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
               작성된 회고를 중심으로 모아보고 필요할 때 작성하세요

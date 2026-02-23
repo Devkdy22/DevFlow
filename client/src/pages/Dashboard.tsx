@@ -535,6 +535,11 @@ export function Dashboard() {
       }, {}),
     [rawProjects]
   );
+  const unifiedCardShadow =
+    "shadow-[0_16px_36px_rgba(15,23,42,0.14)] dark:shadow-[0_18px_40px_rgba(2,6,23,0.34)]";
+  const baseGlassCard = `group relative overflow-hidden border border-white/78 dark:border-slate-700/55 bg-white/62 dark:bg-slate-800/44 backdrop-blur-2xl ring-1 ring-white/68 dark:ring-white/8 transition-all duration-320 hover:-translate-y-1.5 hover:scale-[1.048] hover:shadow-[0_28px_64px_rgba(59,130,246,0.22),0_18px_38px_rgba(15,23,42,0.15)] dark:hover:shadow-[0_28px_64px_rgba(2,6,23,0.52)] ${unifiedCardShadow}`;
+  const projectCardGlass = `group relative overflow-hidden border border-white/78 dark:border-slate-700/55 bg-white/62 dark:bg-slate-800/44 backdrop-blur-2xl ring-1 ring-white/68 dark:ring-white/8 transition-all duration-280 hover:-translate-y-1 hover:scale-[1.018] hover:shadow-[0_20px_42px_rgba(59,130,246,0.16),0_12px_26px_rgba(15,23,42,0.12)] dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.44)] ${unifiedCardShadow}`;
+  const statGlassCard = `group relative overflow-hidden border border-white/86 dark:border-slate-700/60 bg-white/72 dark:bg-slate-800/50 backdrop-blur-3xl ring-1 ring-white/76 dark:ring-white/10 transition-all duration-320 hover:-translate-y-2 hover:scale-[1.052] hover:shadow-[0_32px_70px_rgba(59,130,246,0.24),0_18px_38px_rgba(15,23,42,0.14)] dark:hover:shadow-[0_32px_70px_rgba(2,6,23,0.54)] ${unifiedCardShadow}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 relative overflow-hidden">
@@ -591,10 +596,10 @@ export function Dashboard() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05, y: -5 }}
+              whileHover={{ scale: 1.03, y: -8 }}
             >
               <Card
-                className={`relative overflow-hidden group hover:shadow-2xl transition-all duration-300 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 ${
+                className={`${statGlassCard} ${
                   isProjects || isCompleted || isUpcoming
                     ? "cursor-pointer"
                     : ""
@@ -611,6 +616,9 @@ export function Dashboard() {
                     background: `linear-gradient(to bottom right, ${stat.color})`,
                   }}
                 />
+                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/46 via-white/8 to-transparent dark:from-white/10 dark:via-white/0 dark:to-transparent" />
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-white/70 dark:bg-white/20" />
+                <div className="pointer-events-none absolute -top-16 -right-12 h-44 w-44 rounded-full bg-white/45 blur-3xl opacity-35 transition-all duration-300 group-hover:opacity-65 group-hover:scale-110 dark:bg-white/8 dark:opacity-25 dark:group-hover:opacity-45" />
                 <div className="relative p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div
@@ -656,7 +664,7 @@ export function Dashboard() {
 
             <div className="space-y-4">
               {loading && projects.length === 0 && (
-                <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50">
+                <Card className={`p-6 ${baseGlassCard}`}>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">
                     프로젝트 데이터를 불러오는 중입니다...
                   </p>
@@ -664,7 +672,7 @@ export function Dashboard() {
               )}
 
               {!loading && projects.length === 0 && !error && (
-                <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50">
+                <Card className={`p-6 ${baseGlassCard}`}>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">
                     아직 등록된 프로젝트가 없습니다. 상단의 "새 프로젝트" 버튼을
                     눌러 첫 프로젝트를 만들어 보세요.
@@ -678,13 +686,14 @@ export function Dashboard() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02, x: 5 }}
+                  whileHover={{ scale: 1.012, x: 3 }}
                 >
                   <Card
-                    className={`p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300 ${
+                    className={`p-6 transition-all duration-280 ${projectCardGlass} ${
                       highlightProjects ? "ring-2 ring-indigo-400/60" : ""
                     }`}
                   >
+                    <div className="pointer-events-none absolute -top-14 -right-10 h-36 w-36 rounded-full bg-white/40 blur-3xl opacity-30 transition-all duration-300 group-hover:opacity-60 group-hover:scale-110 dark:bg-white/8 dark:opacity-20 dark:group-hover:opacity-40" />
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
@@ -758,7 +767,7 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 shadow-xl">
+              <Card className={`p-6 ${baseGlassCard}`}>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   빠른 작업
                 </h3>
@@ -803,7 +812,7 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <Card className="p-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-2xl border-white/50 dark:border-slate-700/50 shadow-xl">
+              <Card className={`p-6 ${baseGlassCard}`}>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   최근 활동
                 </h3>
@@ -859,9 +868,9 @@ export function Dashboard() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.5 }}
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.04 }}
             >
-              <Card className="p-6 bg-gradient-to-br from-red-50/80 to-orange-50/80 dark:from-red-950/20 dark:to-orange-950/20 border-red-200 dark:border-red-800 backdrop-blur-2xl shadow-xl">
+              <Card className={`p-6 bg-gradient-to-br from-red-50/80 to-orange-50/80 dark:from-red-950/20 dark:to-orange-950/20 border-red-200 dark:border-red-800 backdrop-blur-2xl ${unifiedCardShadow}`}>
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
                   <div>
@@ -890,7 +899,7 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.6 }}
             >
-              <Card className="p-6 bg-white/60 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-2xl shadow-xl">
+              <Card className={`p-6 bg-white/60 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/70 backdrop-blur-2xl ${unifiedCardShadow}`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm text-slate-500 dark:text-slate-400">

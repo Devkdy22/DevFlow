@@ -274,7 +274,7 @@ export function TaskBoard() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 dark:from-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <TechBackground />
 
       <div className="max-w-7xl mx-auto p-6 relative z-10">
@@ -283,7 +283,9 @@ export function TaskBoard() {
           <div className="flex justify-between">
             <div className="flex items-center gap-3">
               <Kanban className="h-8 w-8 text-indigo-500" />
-              <h1 className="text-2xl font-bold">태스크 보드</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                태스크 보드
+              </h1>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate("/dashboard")}>

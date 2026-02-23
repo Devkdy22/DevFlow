@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import axios from "axios";
+import { LayoutGroup, motion } from "motion/react";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { Code2, LogOut } from "lucide-react";
 import { Button } from "./components/ui/button";
@@ -461,6 +462,7 @@ function StableShell({
   const location = useLocation();
   const { theme } = useTheme();
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [hoveredNavPath, setHoveredNavPath] = useState<string | null>(null);
   const hideTimerRef = useRef<number | null>(null);
 
   const clearHideTimer = useCallback(() => {
@@ -521,6 +523,21 @@ function StableShell({
   }, [location.pathname, clearHideTimer]);
 
   const isDark = theme === "dark";
+  const normalizedPath =
+    location.pathname.replace(/\/+$/, "") === ""
+      ? "/"
+      : location.pathname.replace(/\/+$/, "");
+  const activeNavPath =
+    APP_NAVIGATION.find(item => {
+      const normalizedItemPath =
+        item.path.replace(/\/+$/, "") === ""
+          ? "/"
+          : item.path.replace(/\/+$/, "");
+      return (
+        normalizedPath === normalizedItemPath ||
+        normalizedPath.startsWith(`${normalizedItemPath}/`)
+      );
+    })?.path ?? null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-emerald-50/30 text-foreground dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -534,8 +551,8 @@ function StableShell({
         <div
           className={`mx-auto w-full max-w-[1600px] rounded-[30px] px-4 py-3 backdrop-blur-3xl md:px-6 ${
             isDark
-              ? "border border-white/28 bg-slate-900/46 shadow-[0_24px_48px_rgba(2,6,23,0.38)] ring-1 ring-white/10"
-              : "border border-white/80 bg-white/62 shadow-[0_18px_42px_rgba(15,23,42,0.14)] ring-1 ring-white/65"
+              ? "bg-slate-900/48 shadow-[0_24px_48px_rgba(2,6,23,0.42)] ring-1 ring-white/12"
+              : "bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,248,255,0.76)_42%,rgba(236,246,255,0.68))] shadow-[0_26px_52px_rgba(59,130,246,0.16),0_18px_38px_rgba(15,23,42,0.14)] ring-1 ring-white/95"
           }`}
         >
           <div className="flex items-center justify-between gap-4">
@@ -557,10 +574,10 @@ function StableShell({
               <button
                 type="button"
                 onClick={onLogout}
-                className={`inline-flex h-12 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
+                className={`inline-flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition-all duration-220 hover:-translate-y-0.5 hover:scale-[1.03] active:translate-y-0 active:scale-[0.98] ${
                   isDark
-                    ? "border border-white/35 bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] hover:bg-white/22"
-                    : "border border-white/85 bg-white/70 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] hover:bg-white"
+                    ? "bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_10px_20px_rgba(0,0,0,0.22)] ring-1 ring-white/22 hover:bg-white/24"
+                    : "bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(239,248,255,0.78))] text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_14px_28px_rgba(59,130,246,0.18),0_10px_20px_rgba(15,23,42,0.1)] ring-1 ring-white hover:bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(233,245,255,0.9))]"
                 }`}
               >
                 <LogOut className="h-4 w-4" />
@@ -569,34 +586,117 @@ function StableShell({
             </div>
           </div>
 
-          <div
-            className={`mt-3 flex flex-wrap items-center justify-center gap-2.5 pt-3 ${
-              isDark ? "border-t border-white/12" : "border-t border-slate-200"
-            }`}
-          >
-            {APP_NAVIGATION.map(item => {
-              const isActive = location.pathname === item.path;
-              return (
-                <button
-                  key={item.path}
-                  type="button"
-                  onClick={() => navigate(item.path)}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] md:text-[15px] ${
-                    isActive
-                      ? isDark
-                        ? "border-white/85 bg-white/94 text-slate-900 shadow-[0_10px_24px_rgba(255,255,255,0.26)]"
-                        : "border-white bg-white text-indigo-900 shadow-[0_10px_24px_rgba(79,70,229,0.16)]"
-                      : isDark
-                        ? "border-white/30 bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] hover:bg-white/20"
-                        : "border-white/90 bg-white/72 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-white"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+            <LayoutGroup id="header-nav-glass">
+              {APP_NAVIGATION.map(item => {
+                const isActive = activeNavPath === item.path;
+                const isHovered = hoveredNavPath === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={() => navigate(item.path)}
+                    onMouseEnter={() => setHoveredNavPath(item.path)}
+                    onMouseLeave={() => setHoveredNavPath(null)}
+                    onFocus={() => setHoveredNavPath(item.path)}
+                    onBlur={() => setHoveredNavPath(null)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`group relative inline-flex isolate items-center gap-2 overflow-hidden rounded-full px-6 py-3.5 text-sm font-semibold outline-none backdrop-blur-xl backdrop-saturate-150 transition-all duration-260 hover:-translate-y-0.5 hover:scale-[1.045] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 focus-visible:ring-offset-0 active:translate-y-0 active:scale-[0.985] md:text-[15px] ${
+                      isActive
+                        ? isDark
+                          ? "text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.58)] shadow-[0_22px_40px_rgba(2,6,23,0.42),0_12px_22px_rgba(59,130,246,0.2),0_6px_12px_rgba(15,23,42,0.24)]"
+                          : "text-slate-800 [text-shadow:0_1px_1px_rgba(255,255,255,0.72)] shadow-[0_22px_42px_rgba(99,102,241,0.26),0_12px_24px_rgba(59,130,246,0.18),0_6px_14px_rgba(15,23,42,0.14)]"
+                        : isDark
+                          ? "text-slate-200/92 hover:text-white"
+                          : "text-slate-700 hover:text-slate-900"
+                    }`}
+                  >
+                    {isActive ? (
+                      <>
+                        {!isDark && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute -inset-x-12 -inset-y-8 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.22)_0%,rgba(59,130,246,0.16)_34%,rgba(148,163,184,0.12)_56%,transparent_78%)] opacity-85 blur-2xl"
+                          />
+                        )}
+                        {isDark && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute -inset-x-10 -inset-y-7 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.24)_0%,rgba(99,102,241,0.2)_38%,rgba(2,6,23,0.24)_62%,transparent_82%)] opacity-80 blur-2xl"
+                          />
+                        )}
+                        <span
+                          aria-hidden
+                          className={`pointer-events-none absolute inset-0 rounded-full ${
+                            isDark
+                              ? "bg-[linear-gradient(145deg,rgba(67,85,134,0.84),rgba(35,48,82,0.9)_48%,rgba(18,28,54,0.94))] shadow-[0_34px_58px_rgba(2,6,23,0.68),0_16px_30px_rgba(59,130,246,0.34),0_8px_18px_rgba(15,23,42,0.42),inset_0_1px_0_rgba(167,180,215,0.42),inset_0_-12px_20px_rgba(2,6,23,0.42)] ring-1 ring-indigo-200/42"
+                              : "bg-[linear-gradient(142deg,rgba(255,255,255,0.78),rgba(246,250,255,0.72)_30%,rgba(236,244,255,0.7)_54%,rgba(223,237,255,0.68))] shadow-[0_94px_132px_rgba(148,163,184,0.4),0_52px_86px_rgba(100,116,139,0.3),0_28px_48px_rgba(15,23,42,0.25),0_14px_24px_rgba(203,213,225,0.3),inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-16px_28px_rgba(148,163,184,0.12)] ring-[1.5px] ring-white/90"
+                          }`}
+                        />
+                        <motion.span
+                          layoutId="nav-glass-pill"
+                          transition={{
+                            type: "tween",
+                            duration: 0.24,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          aria-hidden
+                          className={`pointer-events-none absolute inset-0 rounded-full ${
+                            isDark
+                              ? "bg-[radial-gradient(circle_at_22%_9%,rgba(191,219,254,0.36),rgba(165,180,252,0.22)_30%,transparent_64%)] shadow-[inset_0_1px_0_rgba(191,219,254,0.28),inset_0_-12px_20px_rgba(15,23,42,0.42)]"
+                              : "bg-[radial-gradient(circle_at_18%_8%,rgba(255,255,255,0.96),rgba(241,245,249,0.62)_30%,rgba(226,232,240,0.28)_46%,transparent_70%)] shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-14px_24px_rgba(148,163,184,0.16)]"
+                          }`}
+                        />
+                        {!isDark && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 rounded-full bg-[linear-gradient(115deg,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.18)_34%,rgba(255,255,255,0.06)_56%,rgba(226,232,240,0.2)_80%,rgba(255,255,255,0.5)_100%)] opacity-90 mix-blend-screen"
+                          />
+                        )}
+                        {!isDark && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute -inset-x-10 -inset-y-6 rounded-full bg-[radial-gradient(circle,rgba(226,232,240,0.38)_0%,rgba(203,213,225,0.24)_42%,rgba(148,163,184,0.12)_58%,transparent_76%)] opacity-88 blur-xl"
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <motion.span
+                        initial={false}
+                        animate={{
+                          scale: isHovered ? 1 : 0.78,
+                          opacity: isHovered ? 1 : 0,
+                        }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        aria-hidden
+                        className={`pointer-events-none absolute inset-0 rounded-full ${
+                          isDark
+                            ? "bg-[linear-gradient(135deg,rgba(255,255,255,0.26),rgba(255,255,255,0.1))] ring-1 ring-white/30 shadow-[0_10px_22px_rgba(2,6,23,0.28)]"
+                            : "bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(249,250,251,0.9)_44%,rgba(241,245,249,0.86))] ring-1 ring-white shadow-[0_44px_68px_rgba(148,163,184,0.48),0_24px_42px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.98)]"
+                        }`}
+                      />
+                    )}
+
+                    <item.icon
+                      className={`relative z-10 h-4 w-4 shrink-0 opacity-100 ${
+                        isActive
+                          ? isDark
+                            ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                            : "text-slate-700"
+                          : ""
+                      }`}
+                    />
+                    <span
+                      className={`relative z-10 opacity-100 ${
+                        isActive ? "font-bold drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)]" : ""
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </LayoutGroup>
           </div>
         </div>
       </header>

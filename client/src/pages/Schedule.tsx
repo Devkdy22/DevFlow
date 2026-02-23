@@ -289,8 +289,8 @@ export function Schedule() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [palettePulse, setPalettePulse] = useState(false);
   const [dragPaletteName, setDragPaletteName] = useState<string | null>(null);
-  const [showCreateCategoryPanel, setShowCreateCategoryPanel] = useState(false);
-  const [showEditCategoryPanel, setShowEditCategoryPanel] = useState(false);
+  const [showCreateCategoryPanel, setShowCreateCategoryPanel] = useState(true);
+  const [showEditCategoryPanel, setShowEditCategoryPanel] = useState(true);
   const [selectedDayQuery, setSelectedDayQuery] = useState("");
   const [selectedDayCategory, setSelectedDayCategory] = useState("all");
   const [selectedDayExpanded, setSelectedDayExpanded] = useState(false);
@@ -444,7 +444,7 @@ export function Schedule() {
     setEditMode(hasRange ? "range" : "single");
     setEditCategory(item.category ?? "");
     setEditMemo(item.memo ?? "");
-    setShowEditCategoryPanel(false);
+    setShowEditCategoryPanel(true);
     setOpenEdit(true);
   };
 
@@ -759,7 +759,9 @@ export function Schedule() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <CalendarIcon className="h-8 w-8 text-indigo-600" />
-              <h1 className="text-gray-900 dark:text-white">일정 관리</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                일정 관리
+              </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
               개인 일정과 프로젝트 일정을 관리하세요
@@ -779,7 +781,7 @@ export function Schedule() {
                 setDate(selectedBase);
                 setRangeStartDate(selectedBase);
                 setRangeEndDate(selectedBase);
-                setShowCreateCategoryPanel(false);
+                setShowCreateCategoryPanel(true);
                 setOpenCreate(true);
               }}
               className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
@@ -1112,7 +1114,7 @@ export function Schedule() {
       {/* Create Dialog */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent
-          className="w-[min(96vw,1120px)] max-h-[90vh] p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
+          className="w-[min(94vw,1080px)] max-w-[1080px] sm:max-w-[1080px] max-h-none p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -1125,13 +1127,13 @@ export function Schedule() {
           </DialogHeader>
 
           <form onSubmit={createSchedule} className="space-y-0">
-            <div className="max-h-[calc(90vh-144px)] overflow-y-auto px-6 py-4 space-y-4">
+            <div className="px-7 py-5 space-y-5">
               <div className="text-xs text-slate-500">
                 작성일: {new Date().toLocaleString()}
               </div>
-              <div className="grid lg:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.06fr)] gap-6">
+                <div className="min-w-0 space-y-5">
+                  <div className="space-y-2.5">
                     <Label>제목</Label>
                     <Input
                       value={title}
@@ -1139,12 +1141,12 @@ export function Schedule() {
                       className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>일정 유형</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
+                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
                       <button
                         type="button"
-                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                        className={`rounded-lg px-3 py-2 text-sm whitespace-nowrap transition ${
                           createMode === "single"
                             ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
                             : "text-slate-500 dark:text-slate-300"
@@ -1155,7 +1157,7 @@ export function Schedule() {
                       </button>
                       <button
                         type="button"
-                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                        className={`rounded-lg px-3 py-2 text-sm whitespace-nowrap transition ${
                           createMode === "range"
                             ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
                             : "text-slate-500 dark:text-slate-300"
@@ -1166,7 +1168,7 @@ export function Schedule() {
                       </button>
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>날짜</Label>
                     {createMode === "single" ? (
                       <Input
@@ -1198,7 +1200,7 @@ export function Schedule() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>메모</Label>
                     <Textarea
                       rows={6}
@@ -1208,8 +1210,8 @@ export function Schedule() {
                     />
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
+                <div className="min-w-0 space-y-5">
+                  <div className="space-y-2.5">
                     <Label>카테고리</Label>
                     <Select value={category || undefined} onValueChange={setCategory}>
                       <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
@@ -1224,17 +1226,17 @@ export function Schedule() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-3 bg-slate-50/70 dark:bg-slate-900/40">
+                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-5 bg-slate-50/70 dark:bg-slate-900/40">
                     <button
                       type="button"
-                      className="w-full flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200"
+                      className="w-full flex items-center justify-between gap-3 text-left text-sm font-medium text-slate-700 dark:text-slate-200"
                       onClick={() => setShowCreateCategoryPanel(v => !v)}
                     >
-                      <span>카테고리 색상/팔레트 설정</span>
-                      <span>{showCreateCategoryPanel ? "접기" : "열기"}</span>
+                      <span className="whitespace-nowrap">카테고리 색상/팔레트 설정</span>
+                      <span className="whitespace-nowrap">{showCreateCategoryPanel ? "접기" : "열기"}</span>
                     </button>
                     {showCreateCategoryPanel && (
-                      <div className="mt-3">
+                      <div className="mt-4 min-w-0">
                         <CategoryColorPanel
                           paletteName={paletteName}
                           onChangePaletteName={setPaletteName}
@@ -1314,7 +1316,7 @@ export function Schedule() {
       {/* Edit Dialog */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
         <DialogContent
-          className="w-[min(96vw,1120px)] max-h-[90vh] p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
+          className="w-[min(94vw,1080px)] max-w-[1080px] sm:max-w-[1080px] max-h-none p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-700/70"
           onKeyDown={e => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
@@ -1327,10 +1329,10 @@ export function Schedule() {
           </DialogHeader>
 
           <form onSubmit={updateSchedule} className="space-y-0">
-            <div className="max-h-[calc(90vh-144px)] overflow-y-auto px-6 py-4 space-y-4">
-              <div className="grid lg:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
+            <div className="px-7 py-5 space-y-5">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.06fr)] gap-6">
+                <div className="min-w-0 space-y-5">
+                  <div className="space-y-2.5">
                     <Label>제목</Label>
                     <Input
                       value={editTitle}
@@ -1338,12 +1340,12 @@ export function Schedule() {
                       className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>일정 유형</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
+                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-1 bg-slate-50/70 dark:bg-slate-900/40">
                       <button
                         type="button"
-                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                        className={`rounded-lg px-3 py-2 text-sm whitespace-nowrap transition ${
                           editMode === "single"
                             ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
                             : "text-slate-500 dark:text-slate-300"
@@ -1354,7 +1356,7 @@ export function Schedule() {
                       </button>
                       <button
                         type="button"
-                        className={`rounded-lg px-3 py-2 text-sm transition ${
+                        className={`rounded-lg px-3 py-2 text-sm whitespace-nowrap transition ${
                           editMode === "range"
                             ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300"
                             : "text-slate-500 dark:text-slate-300"
@@ -1365,7 +1367,7 @@ export function Schedule() {
                       </button>
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>날짜</Label>
                     {editMode === "single" ? (
                       <Input
@@ -1397,7 +1399,7 @@ export function Schedule() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="space-y-2.5">
                     <Label>메모</Label>
                     <Textarea
                       rows={6}
@@ -1407,8 +1409,8 @@ export function Schedule() {
                     />
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
+                <div className="min-w-0 space-y-5">
+                  <div className="space-y-2.5">
                     <Label>카테고리</Label>
                     <Select
                       value={editCategory || undefined}
@@ -1426,17 +1428,17 @@ export function Schedule() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-3 bg-slate-50/70 dark:bg-slate-900/40">
+                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/70 p-5 bg-slate-50/70 dark:bg-slate-900/40">
                     <button
                       type="button"
-                      className="w-full flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200"
+                      className="w-full flex items-center justify-between gap-3 text-left text-sm font-medium text-slate-700 dark:text-slate-200"
                       onClick={() => setShowEditCategoryPanel(v => !v)}
                     >
-                      <span>카테고리 색상/팔레트 설정</span>
-                      <span>{showEditCategoryPanel ? "접기" : "열기"}</span>
+                      <span className="whitespace-nowrap">카테고리 색상/팔레트 설정</span>
+                      <span className="whitespace-nowrap">{showEditCategoryPanel ? "접기" : "열기"}</span>
                     </button>
                     {showEditCategoryPanel && (
-                      <div className="mt-3">
+                      <div className="mt-4 min-w-0">
                         <CategoryColorPanel
                           paletteName={paletteName}
                           onChangePaletteName={setPaletteName}
