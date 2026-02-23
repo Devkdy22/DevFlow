@@ -89,18 +89,18 @@ export function CategoryColorPanel({
   onAddCategory,
 }: CategoryColorPanelProps) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 dark:border-slate-700/70 p-4 space-y-4 bg-gradient-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-950/60 shadow-inner">
+    <div className="min-w-0 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 p-5 space-y-5 bg-gradient-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-950/60 shadow-inner">
       <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
         카테고리 색상
       </div>
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Input
             placeholder="팔레트 이름"
             value={paletteName}
             onChange={e => onChangePaletteName(e.target.value)}
-            className="h-9 w-40"
+            className="h-9 w-48"
           />
           <Button type="button" onClick={onSavePalette}>
             팔레트 저장
@@ -108,13 +108,13 @@ export function CategoryColorPanel({
         </div>
 
         {sortedPalettes.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {sortedPalettes.map(p => (
               <motion.div
                 key={p.name}
                 layout
                 whileHover={{ y: -2 }}
-                className="flex items-center gap-2 rounded-full border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70 px-3 py-1 text-xs"
+                className="flex max-w-full items-center gap-2 rounded-full border border-slate-200/70 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/70 px-3 py-1 text-xs"
                 draggable
                 onDragStart={() => onDragStartPalette(p.name)}
                 onDragOver={e => e.preventDefault()}
@@ -185,7 +185,7 @@ export function CategoryColorPanel({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {presetPalettes.map(p => (
             <button
               key={p.label}
@@ -208,11 +208,11 @@ export function CategoryColorPanel({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         {allCategories.length === 0 && (
           <div className="text-xs text-slate-500">아직 카테고리가 없습니다.</div>
         )}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-4">
           <Input
             placeholder="카테고리 검색"
             value={categoryFilter}
@@ -221,7 +221,7 @@ export function CategoryColorPanel({
           />
           <button
             type="button"
-            className="text-xs text-slate-500"
+            className="shrink-0 whitespace-nowrap text-xs text-slate-500"
             onClick={() => onChangeCategoryFilter("")}
           >
             초기화
@@ -229,7 +229,7 @@ export function CategoryColorPanel({
         </div>
 
         <div
-          className={`grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1 ${
+          className={`grid grid-cols-1 gap-3 h-[198px] overflow-y-auto pr-1 ${
             palettePulse
               ? "animate-[paletteGlow_0.7s_ease-in-out_1] ring-2 ring-indigo-300/50 rounded-xl p-1"
               : ""
@@ -245,17 +245,17 @@ export function CategoryColorPanel({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/70 px-2 py-2"
+                className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/70 px-3 py-3"
               >
                 <span
-                  className="inline-flex items-center gap-2 text-xs"
+                  className="inline-flex min-w-0 items-center gap-2 text-xs"
                   style={{ color: colorForCategory(cat) }}
                 >
                   <span
                     className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: colorForCategory(cat) }}
                   />
-                  {renderHighlighted(cat)}
+                  <span className="truncate">{renderHighlighted(cat)}</span>
                 </span>
                 <div className="flex items-center gap-1">
                   <input
@@ -291,12 +291,12 @@ export function CategoryColorPanel({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
         <Input
           placeholder="새 카테고리"
           value={newCategoryName}
           onChange={e => onChangeNewCategoryName(e.target.value)}
-          className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+          className="min-w-0 flex-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
         />
         <input
           type="color"
