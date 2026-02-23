@@ -945,14 +945,14 @@ export function Schedule() {
                   value={selectedDayQuery}
                   onChange={e => setSelectedDayQuery(e.target.value)}
                   placeholder="제목/메모 검색"
-                  className="h-9 bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600"
+                  className="bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600"
                 />
                 <div className="flex items-center gap-2">
                   <Select
                     value={selectedDayCategory}
                     onValueChange={setSelectedDayCategory}
                   >
-                    <SelectTrigger className="h-9 bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600">
+                    <SelectTrigger className="bg-white/90 dark:bg-slate-800/90 border-slate-300 dark:border-slate-600">
                       <SelectValue placeholder="카테고리" />
                     </SelectTrigger>
                     <SelectContent>

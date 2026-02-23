@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
-import { FileText } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import {
   Dialog,
@@ -216,7 +216,8 @@ export function Retrospective() {
               onClick={() => setCreateOpen(true)}
               className="bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white"
             >
-              회고 작성
+              <Plus className="h-4 w-4" />
+              새 회고 작성
             </Button>
           </div>
         </div>
@@ -322,6 +323,7 @@ export function Retrospective() {
                 className="mt-4 w-full bg-gradient-to-r from-[#4F46E5] to-[#7C3AED] text-white"
                 onClick={() => setCreateOpen(true)}
               >
+                <Plus className="h-4 w-4" />
                 새 회고 작성
               </Button>
             </Card>
