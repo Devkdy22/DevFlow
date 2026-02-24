@@ -96,6 +96,7 @@ npm run test:libs
 - [Frontend Libraries](./docs/frontend-libraries.md)
 - [Animation Strategy](./docs/animation.md)
 - [Testing Strategy](./docs/testing.md)
+- [Free Deployment Guide](./docs/deploy-free.md)
 
 ---
 
