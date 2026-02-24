@@ -94,27 +94,43 @@ function buildDashboardProjects(
   projects: Project[],
   tasks: Task[]
 ): DashboardProject[] {
-  const tasksByProject = tasks.reduce<Record<string, Task[]>>((acc, task) => {
+  const statsByProject = tasks.reduce<
+    Record<string, { total: number; completed: number; nextDueTs: number | null }>
+  >((acc, task) => {
     const key = task.projectId ?? "unassigned";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(task);
+    if (!acc[key]) {
+      acc[key] = { total: 0, completed: 0, nextDueTs: null };
+    }
+
+    acc[key].total += 1;
+    if (task.status === "done" || task.status === "완료") {
+      acc[key].completed += 1;
+    }
+
+    if (task.dueDate) {
+      const dueTs = new Date(task.dueDate).getTime();
+      if (
+        !Number.isNaN(dueTs) &&
+        (acc[key].nextDueTs === null || dueTs < acc[key].nextDueTs)
+      ) {
+        acc[key].nextDueTs = dueTs;
+      }
+    }
+
     return acc;
   }, {});
 
   return projects.map(project => {
-    const projectTasks = tasksByProject[project._id] ?? [];
-    const total = projectTasks.length;
-    const completed = projectTasks.filter(
-      t => t.status === "done" || t.status === "완료"
-    ).length;
+    const projectStats = statsByProject[project._id] ?? {
+      total: 0,
+      completed: 0,
+      nextDueTs: null,
+    };
+    const total = projectStats.total;
+    const completed = projectStats.completed;
     const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    const dueDates = projectTasks
-      .map(t => (t.dueDate ? new Date(t.dueDate) : null))
-      .filter((d): d is Date => d !== null)
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    const nextDue = dueDates[0];
+    const nextDue =
+      projectStats.nextDueTs !== null ? new Date(projectStats.nextDueTs) : null;
 
     return {
       id: project._id,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import api from "../services/api";
 import {
@@ -56,6 +56,9 @@ export function TaskBoard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [projectSelectionReady, setProjectSelectionReady] = useState(false);
+  const prefetchedRef = useRef<{ projectId: string; items: Task[] } | null>(
+    null
+  );
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<
     "todo" | "doing" | "done" | null
@@ -100,31 +103,79 @@ export function TaskBoard() {
     }
   };
 
-  // useEffect(() => {
-  //   load();
-  // }, []);
   useEffect(() => {
-    setProjectSelectionReady(false);
-    api.get<Project[]>("/api/projects").then(res => {
-      setProjects(res.data);
+    let mounted = true;
+
+    const primeBoardData = async () => {
+      setProjectSelectionReady(false);
 
       const queryProjectId = searchParams.get("projectId") || "";
-      const exists = res.data.some(p => p._id === queryProjectId);
+      const isObjectId = /^[a-f\d]{24}$/i.test(queryProjectId);
+      const requestedProjectId =
+        queryProjectId && isObjectId ? queryProjectId : ALL_PROJECTS;
+      const params =
+        requestedProjectId !== ALL_PROJECTS
+          ? { projectId: requestedProjectId }
+          : undefined;
 
-      if (queryProjectId && exists) {
-        setSelectedProjectId(queryProjectId);
-      } else if (!queryProjectId) {
-        setSelectedProjectId(ALL_PROJECTS);
-      } else {
-        setSelectedProjectId(ALL_PROJECTS);
-        showToast("선택한 프로젝트를 찾을 수 없어 전체 태스크를 표시합니다.");
+      try {
+        const [projectsRes, tasksRes] = await Promise.all([
+          api.get<Project[]>("/api/projects"),
+          api.get<Task[]>("/api/tasks", { params }),
+        ]);
+
+        if (!mounted) return;
+
+        const nextProjects = projectsRes.data || [];
+        setProjects(nextProjects);
+
+        const exists = queryProjectId
+          ? nextProjects.some(project => project._id === queryProjectId)
+          : false;
+        const resolvedProjectId =
+          queryProjectId && exists ? queryProjectId : ALL_PROJECTS;
+
+        if (queryProjectId && !exists) {
+          showToast("선택한 프로젝트를 찾을 수 없어 전체 태스크를 표시합니다.");
+        }
+
+        if (resolvedProjectId === requestedProjectId) {
+          prefetchedRef.current = {
+            projectId: resolvedProjectId,
+            items: tasksRes.data || [],
+          };
+        } else {
+          prefetchedRef.current = null;
+        }
+
+        setSelectedProjectId(resolvedProjectId);
+        setProjectSelectionReady(true);
+      } catch (error: unknown) {
+        if (!mounted) return;
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          navigate("/login");
+          return;
+        }
+        showToast(getErrorMessage(error) || "데이터 로드 실패");
+        setProjectSelectionReady(true);
       }
-      setProjectSelectionReady(true);
-    });
-  }, [searchParams]);
+    };
+
+    void primeBoardData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     if (!projectSelectionReady) return;
+    const prefetched = prefetchedRef.current;
+    if (prefetched && prefetched.projectId === selectedProjectId) {
+      setItems(prefetched.items);
+      prefetchedRef.current = null;
+      return;
+    }
     load(selectedProjectId);
   }, [selectedProjectId, projectSelectionReady]);
 
