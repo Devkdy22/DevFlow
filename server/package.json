@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "start:prod": "tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest --runInBand",
