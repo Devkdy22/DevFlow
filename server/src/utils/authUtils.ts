@@ -58,7 +58,16 @@ const testSMTPConnection = async () => {
     console.error("SMTP 연결 실패 ❌", err);
   }
 };
-testSMTPConnection();
+const hasSMTPConfig = () => {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  return Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS);
+};
+
+if (hasSMTPConfig()) {
+  void testSMTPConnection();
+} else {
+  console.warn("Warning: SMTP_* 환경 변수가 없어 메일 기능이 비활성 상태입니다.");
+}
 
 // 비밀번호 재설정 이메일 발송
 export async function sendResetEmail(email: string, token: string) {

@@ -6,10 +6,14 @@ dotenv.config();
 const PORT = process.env.PORT || 5050;
 const MONGODB_URI = process.env.MONGODB_URI as string;
 
-console.log("MONGODB_URI:", process.env.MONGODB_URI);
+console.log("MONGODB_URI configured:", Boolean(MONGODB_URI));
 
 const startServer = async () => {
   try {
+    if (!MONGODB_URI) {
+      console.error("❌ MONGODB_URI is missing");
+      process.exit(1);
+    }
     await connectDB(MONGODB_URI);
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
