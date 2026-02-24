@@ -16,6 +16,6 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && ./../../client/node_modules/.bin/tsc -p tsconfig.json"
+    "build": "npm run clean && npx -p typescript tsc -p tsconfig.json"
   }
 }
