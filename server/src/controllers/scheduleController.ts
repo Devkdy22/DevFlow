@@ -55,7 +55,7 @@ export const createSchedule = async (req: Request, res: Response) => {
 // 전체 일정 조회
 export const getAllSchedules = async (req: Request, res: Response) => {
   try {
-    const schedules = await Schedule.find();
+    const schedules = await Schedule.find().lean();
     res.json(schedules);
   } catch (error) {
     res.status(500).json({ message: "일정 조회 실패", error });
@@ -65,7 +65,7 @@ export const getAllSchedules = async (req: Request, res: Response) => {
 // 사용자별 일정 조회
 export const getSchedulesByUser = async (req: Request, res: Response) => {
   try {
-    const schedules = await Schedule.find({ userId: req.params.userId });
+    const schedules = await Schedule.find({ userId: req.params.userId }).lean();
     res.json(schedules);
   } catch (error) {
     res.status(500).json({ message: "사용자 일정 조회 실패", error });

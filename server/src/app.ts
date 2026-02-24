@@ -11,11 +11,19 @@ import githubAuthRoutes from "./routes/authGithub";
 
 dotenv.config();
 const app = express();
+const configuredOrigins = (process.env.FRONTEND_URL ?? "")
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = [
+  "http://localhost:5173",
+  ...configuredOrigins,
+];
 
 // 모든 origin 허용 + 프리플라이트 처리
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })

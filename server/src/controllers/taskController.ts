@@ -64,10 +64,6 @@ export const getTasks = async (req: Request, res: Response) => {
 
     const userObjectId = new Types.ObjectId(req.user!.id);
 
-    console.log("🔥 getTasks called");
-    console.log("🔥 userId:", req.user!.id);
-    console.log("🔥 projectId:", projectId);
-
     const filter: any = {
       userId: userObjectId,
     };
@@ -82,10 +78,7 @@ export const getTasks = async (req: Request, res: Response) => {
 
       filter.projectId = new Types.ObjectId(projectId as string);
     }
-    console.log("🔥 filter:", filter);
-
-    const tasks = await Task.find(filter).sort({ createdAt: -1 });
-    console.log("🔥 tasks:", tasks.length);
+    const tasks = await Task.find(filter).sort({ createdAt: -1 }).lean();
 
     res.json(tasks);
   } catch (error: any) {

@@ -36,12 +36,9 @@ export const getUserProjects = async (
   next: NextFunction
 ) => {
   try {
-    console.log("🔥 getUserProjects called");
     const userObjectId = new Types.ObjectId(req.user!.id);
 
-    const projects = await Project.find({ userId: userObjectId });
-    console.log("🔥 userObjectId:", userObjectId.toString());
-    console.log("🔥 projects:", projects.length);
+    const projects = await Project.find({ userId: userObjectId }).lean();
     res.json(projects);
   } catch (error) {
     next(error);
@@ -61,7 +58,7 @@ export const getProjectById = async (
     const project = await Project.findOne({
       _id: projectId,
       userId: userObjectId, //소유자 검증
-    });
+    }).lean();
 
     if (!project) return res.status(404).json({ message: "프로젝트 없음" });
 

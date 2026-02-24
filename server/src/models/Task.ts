@@ -24,4 +24,7 @@ const TaskSchema = new Schema<ITask>({
   memo: { type: String },
 }, { timestamps: true });
 
+TaskSchema.index({ userId: 1, createdAt: -1 });
+TaskSchema.index({ userId: 1, projectId: 1, createdAt: -1 });
+
 export default mongoose.model<ITask>("Task", TaskSchema);

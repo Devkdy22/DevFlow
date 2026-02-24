@@ -25,21 +25,15 @@ router.post("/", protect, createRetro);
  * 회고 목록 조회 (로그인 유저 기준)
  */
 router.get("/", protect, async (req, res) => {
-  console.log("🔥 req.user:", req.user);
-  console.log("🔥 typeof req.user?.id:", typeof req.user?.id);
-
   try {
     if (!req.user) {
       return res.status(401).json({ message: "인증 정보가 없습니다." });
     }
     const userObjectId = new mongoose.Types.ObjectId(req.user.id);
-    console.log("🔥 userObjectId:", userObjectId.toString());
 
     const retros = await Retro.find({ userId: userObjectId })
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log("🔥 찾은 회고 수:", retros.length);
 
     const normalized = retros.map(r => ({
       ...r,
