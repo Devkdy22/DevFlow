@@ -16,11 +16,14 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && node ../../client/node_modules/typescript/bin/tsc -p tsconfig.json"
+    "build": "npm run clean && tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "framer-motion": "^12.23.24",
     "react": "^19.1.1",
     "react-router-dom": "^6.30.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }
