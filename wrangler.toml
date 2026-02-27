@@ -1,0 +1,7 @@
+name = "devflow"
+compatibility_date = "2026-02-27"
+
+# Optional, but keeps local/CI config consistent with the deploy command:
+# `wrangler deploy --assets=client/dist`
+[assets]
+directory = "client/dist"
