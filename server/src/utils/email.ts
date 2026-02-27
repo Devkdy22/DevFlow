@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { Resend } from "resend";
 
 type SendEmailInput = {
   to: string | string[];
@@ -70,20 +69,35 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       throw new Error("RESEND_API_KEY가 설정되지 않았습니다.");
     }
 
-    const resend = new Resend(apiKey);
-    const result = await resend.emails.send({
-      from,
-      to: input.to,
-      subject: input.subject,
-      html: input.html,
-      text: input.text,
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: input.to,
+        subject: input.subject,
+        html: input.html,
+        ...(input.text ? { text: input.text } : {}),
+      }),
     });
 
-    if (result.error) {
-      throw new Error(`Resend 이메일 전송 실패: ${result.error.message}`);
+    const data = (await response.json().catch(() => null)) as
+      | { id?: string; message?: string }
+      | { error?: { message?: string } }
+      | null;
+
+    if (!response.ok) {
+      const message =
+        (data as any)?.error?.message ||
+        (data as any)?.message ||
+        `HTTP ${response.status}`;
+      throw new Error(`Resend 이메일 전송 실패: ${message}`);
     }
 
-    return { provider: "resend", id: result.data?.id };
+    return { provider: "resend", id: (data as any)?.id };
   }
 
   const transporter = createSmtpTransporter();
@@ -104,4 +118,3 @@ export async function verifyEmailProvider(): Promise<void> {
   const transporter = createSmtpTransporter();
   await transporter.verify();
 }
-
