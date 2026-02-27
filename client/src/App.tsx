@@ -11,7 +11,13 @@ import { LayoutGroup, motion } from "motion/react";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { Code2, LogOut } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { sendResetPasswordMail, handleGitHubCallback } from "./services/auth";
+import api from "./services/api";
+import {
+  login,
+  register,
+  sendResetPasswordMail,
+  handleGitHubCallback,
+} from "./services/auth";
 import { APP_NAVIGATION } from "@devflow/navigation";
 import { PageTransition } from "@devflow/motion";
 import {
@@ -74,7 +80,7 @@ function RouteLoadingFallback() {
 }
 
 // Axios Authorization 헤더 설정
-applyAuthHeader(axios.defaults.headers.common, readValidAuthToken(localStorage));
+applyAuthHeader(api.defaults.headers.common, readValidAuthToken(localStorage));
 
 // ✅ 보호된 라우트 컴포넌트
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -119,7 +125,7 @@ function AuthPage() {
       try {
         const { token, user } = await handleGitHubCallback(code, state);
         persistAuthToken(localStorage, token);
-        applyAuthHeader(axios.defaults.headers.common, token);
+        applyAuthHeader(api.defaults.headers.common, token);
         navigate("/dashboard");
         alert(`환영합니다, ${user.name}님!`);
       } catch (error) {
@@ -163,13 +169,13 @@ function AuthPage() {
 
   const handleLogin = async (email: string, password: string) => {
     try {
-      const res = await axios.post("/api/auth/login", { email, password });
+      const res = await login({ email, password });
       const token = res.data?.token;
 
       if (!token) throw new Error("로그인 실패");
 
       persistAuthToken(localStorage, token);
-      applyAuthHeader(axios.defaults.headers.common, token);
+      applyAuthHeader(api.defaults.headers.common, token);
       navigate("/dashboard");
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -189,7 +195,7 @@ function AuthPage() {
     github: string
   ) => {
     try {
-      await axios.post("/api/auth/register", {
+      await register({
         name,
         email,
         password,
@@ -712,7 +718,7 @@ function AppContent() {
   const [authChecked, setAuthChecked] = useState(false);
   const handleLogout = () => {
     clearAuthToken(localStorage);
-    applyAuthHeader(axios.defaults.headers.common, null);
+    applyAuthHeader(api.defaults.headers.common, null);
     navigate("/");
   };
 
@@ -720,7 +726,7 @@ function AppContent() {
     // 인증 상태 확인
     const token = readValidAuthToken(localStorage);
     if (token) {
-      applyAuthHeader(axios.defaults.headers.common, token);
+      applyAuthHeader(api.defaults.headers.common, token);
     }
     setAuthChecked(true);
   }, []);

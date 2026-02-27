@@ -1,7 +1,16 @@
 import axios from "axios";
 
+const rawBaseURL = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const baseURL = rawBaseURL ? rawBaseURL.replace(/\/+$/, "") : "";
+
+if (!baseURL) {
+  console.warn(
+    "VITE_API_URL is not set. API requests will use the current origin, which will break in production."
+  );
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL,
   withCredentials: true,
 });
 
