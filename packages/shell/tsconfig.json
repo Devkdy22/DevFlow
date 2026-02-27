@@ -5,16 +5,7 @@
     "lib": ["ES2020", "DOM"],
     "rootDir": "src",
     "outDir": "dist",
-    "baseUrl": ".",
-    "typeRoots": ["../../client/node_modules/@types"],
-    "types": ["react", "react-dom", "node"],
-    "paths": {
-      "react-router-dom": ["../../client/node_modules/react-router-dom"],
-      "framer-motion": ["../../client/node_modules/framer-motion"],
-      "lucide-react": ["../../client/node_modules/lucide-react"],
-      "@devflow/navigation": ["../navigation/dist/index.d.ts"],
-      "@devflow/motion": ["../motion/dist/index.d.ts"]
-    }
+    "baseUrl": "."
   },
   "include": ["src"]
 }
