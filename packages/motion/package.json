@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && node ../../node_modules/typescript/bin/tsc -p tsconfig.json"
+    "build": "bun run clean && bun x tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "framer-motion": "^12.23.24",
