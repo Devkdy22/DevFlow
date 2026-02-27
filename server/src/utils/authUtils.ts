@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import nodemailer, { Transporter } from "nodemailer";
 import dotenv from "dotenv";
+import { sendEmail, verifyEmailProvider } from "./email";
 dotenv.config();
 
 // 재설정 토큰 생성 (원본 + 해시)
@@ -10,78 +10,30 @@ export const generateResetToken = () => {
   return { token, tokenHash };
 };
 
-// 이메일 전송 설정
-// export const createTransporter = () => {
-//   return nodemailer.createTransport({
-//     host: process.env.SMTP_HOST,
-//     port: Number(process.env.SMTP_PORT),
-//     secure: false, // // true이면 465 포트, false이면 587
-//     auth: {
-//       user: process.env.SMTP_USER,
-//       pass: process.env.SMTP_PASS,
-//     },
-//   });
-// };
-
-// const transporter = createTransporter();
-// transporter.verify((err, success) => {
-//   if (err) console.error("SMTP 연결 실패:", err);
-//   else console.log("SMTP 연결 성공");
-// });
-export const createTransporter = (): Transporter => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
-    throw new Error("SMTP 환경 변수가 설정되지 않았습니다.");
-  }
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: false, // 465: SSL, 587: STARTTLS
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false, // 인증서 무시
-    },
-  });
+// Backwards compat export (legacy code may import this symbol).
+// Prefer using sendEmail()/verifyEmailProvider() from ./email.
+export const createTransporter = () => {
+  throw new Error(
+    "createTransporter는 더 이상 사용하지 않습니다. sendEmail()을 사용하세요."
+  );
 };
 
-const testSMTPConnection = async () => {
-  const transporter = createTransporter();
-  try {
-    await transporter.verify(); // Transporter 타입이므로 오류 없음
-    console.log("SMTP 연결 성공 ✅");
-  } catch (err) {
-    console.error("SMTP 연결 실패 ❌", err);
-  }
-};
-const hasSMTPConfig = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  return Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS);
-};
-
-if (hasSMTPConfig()) {
-  void testSMTPConnection();
-} else {
-  console.warn("Warning: SMTP_* 환경 변수가 없어 메일 기능이 비활성 상태입니다.");
+if ((process.env.EMAIL_VERIFY_ON_BOOT || "").toLowerCase() === "true") {
+  void verifyEmailProvider().then(
+    () => console.log("Email provider verified ✅"),
+    err => console.error("Email provider verify failed ❌", err)
+  );
 }
 
 // 비밀번호 재설정 이메일 발송
 export async function sendResetEmail(email: string, token: string) {
   console.log("sendResetEmail 호출됨:", email, token);
-  const transporter = createTransporter();
 
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   const resetUrl = `${frontendUrl}?reset_token=${token}`;
 
-  const mailOptions = {
-    from: `"DevFlow" <${process.env.SMTP_USER}>`,
-    to: email,
-    subject: "DevFlow 비밀번호 재설정",
-    html: `
+  const subject = "DevFlow 비밀번호 재설정";
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -137,15 +89,11 @@ export async function sendResetEmail(email: string, token: string) {
           </div>
         </body>
       </html>
-    `,
-  };
+    `;
 
-  // await transporter.sendMail(mailOptions);
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("메일 전송 성공:", info);
-    console.log("MessageId:", info.messageId);
-    console.log("Preview URL:", nodemailer.getTestMessageUrl(info));
+    const result = await sendEmail({ to: email, subject, html });
+    console.log("메일 전송 성공:", result);
     return { message: "비밀번호 재설정 메일을 보냈습니다. 메일을 확인하세요." };
   } catch (error) {
     console.error("메일 전송 실패:", error);
