@@ -10,13 +10,9 @@ export default defineConfig({
       "@devflow/core": path.resolve(__dirname, "../packages/core/src"),
       "@devflow/navigation": path.resolve(__dirname, "../packages/navigation/src"),
       "@devflow/motion": path.resolve(__dirname, "../packages/motion/src"),
-      "@devflow/shell": path.resolve(__dirname, "../packages/shell/src"),
-      react: path.resolve(__dirname, "./node_modules/react"),
-      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
-      "react-router-dom": path.resolve(__dirname, "./node_modules/react-router-dom"),
-      "framer-motion": path.resolve(__dirname, "./node_modules/framer-motion"),
-      "lucide-react": path.resolve(__dirname, "./node_modules/lucide-react")
-    }
+      "@devflow/shell": path.resolve(__dirname, "../packages/shell/src")
+    },
+    dedupe: ["react", "react-dom"]
   },
   server: {
     proxy: {
