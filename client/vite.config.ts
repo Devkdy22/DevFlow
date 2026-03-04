@@ -12,7 +12,7 @@ export default defineConfig({
       "@devflow/motion": path.resolve(__dirname, "../packages/motion/src"),
       "@devflow/shell": path.resolve(__dirname, "../packages/shell/src")
     },
-    dedupe: ["react", "react-dom"]
+    dedupe: ["react", "react-dom", "react-router", "react-router-dom"]
   },
   server: {
     proxy: {
