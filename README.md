@@ -10,7 +10,7 @@
 
 > 개발자가 **프로젝트를 기록하고 성장 과정을 추적**할 수 있는 풀스택 사이드 프로젝트입니다.
 >
-> 본 프로젝트는 **React + TypeScript (프론트엔드)** 와 **Express + TypeScript + MongoDB (백엔드)** 로 구성되어 있으며, 추후 **AWS**, **Docker**, **CI/CD** 를 통해 배포 환경까지 확장할 계획입니다.
+> 본 프로젝트는 **React + TypeScript (프론트엔드)** 와 **Express + TypeScript + MongoDB (백엔드)** 로 구성
 
 ---
 
